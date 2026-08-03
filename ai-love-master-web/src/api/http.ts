@@ -3,7 +3,8 @@ import { ElMessage } from 'element-plus';
 import router from '../router';
 
 const http = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
+  // 本地 dev 由 .env.development 指定；生产部署留空走同域（Netlify _redirects 代理 /api）
+  baseURL: import.meta.env.VITE_API_BASE_URL || '',
   timeout: 20000,
 });
 

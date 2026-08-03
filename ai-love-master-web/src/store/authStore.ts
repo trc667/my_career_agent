@@ -5,25 +5,32 @@ import type { LoginRequest, RegisterRequest } from '../api/auth';
 
 const TOKEN_KEY = 'love_master_token';
 const USERNAME_KEY = 'love_master_username';
+const ROLE_KEY = 'love_master_role';
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem(TOKEN_KEY));
   const username = ref<string | null>(localStorage.getItem(USERNAME_KEY));
+  const role = ref<string | null>(localStorage.getItem(ROLE_KEY));
 
   const isAuthenticated = () => !!token.value;
+  const isAdmin = () => role.value === 'ADMIN';
 
-  function setAuth(t: string, name?: string) {
+  function setAuth(t: string, name?: string, r?: string) {
     token.value = t;
     username.value = name ?? null;
+    role.value = r ?? null;
     localStorage.setItem(TOKEN_KEY, t);
     if (name) localStorage.setItem(USERNAME_KEY, name);
+    if (r) localStorage.setItem(ROLE_KEY, r);
   }
 
   function clearAuth() {
     token.value = null;
     username.value = null;
+    role.value = null;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USERNAME_KEY);
+    localStorage.removeItem(ROLE_KEY);
   }
 
   async function login(data: LoginRequest) {
@@ -48,7 +55,8 @@ export const useAuthStore = defineStore('auth', () => {
       dataRes?.accessToken
     ) as string | undefined;
     if (!tokenStr) throw new Error('登录失败：未返回 token');
-    setAuth(tokenStr, (payload?.username as string) ?? data.username);
+    const roleStr = (payload?.role as string | undefined) ?? (dataRes as { role?: string }).role;
+    setAuth(tokenStr, (payload?.username as string) ?? data.username, roleStr);
     return dataRes;
   }
 
@@ -64,7 +72,9 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     token,
     username,
+    role,
     isAuthenticated,
+    isAdmin,
     login,
     register,
     logout,

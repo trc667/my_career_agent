@@ -112,6 +112,22 @@ body {
   background: rgba(114, 100, 240, 0.18);
 }
 
+/* ===== 页面切换过渡（路由跳转） ===== */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
 /* 响应式工具类（供组件引用） */
 @media (max-width: 767px) {
   html {

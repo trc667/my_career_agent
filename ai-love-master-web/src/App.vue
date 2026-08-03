@@ -1,7 +1,11 @@
 <template>
   <div class="app-root" :class="`theme-${theme}`">
     <main class="app-main">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <transition name="page" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
     </main>
     <AppFooter v-if="showFooter" />
   </div>

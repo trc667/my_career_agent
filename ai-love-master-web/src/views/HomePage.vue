@@ -19,6 +19,7 @@
               <el-dropdown-menu>
                 <el-dropdown-item command="center">个人中心</el-dropdown-item>
                 <el-dropdown-item command="feedback">意见反馈</el-dropdown-item>
+                <el-dropdown-item v-if="authStore.isAdmin()" command="admin">管理后台</el-dropdown-item>
                 <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -50,8 +51,8 @@
       <!-- 状态条：实时时钟 + 倒计时 -->
       <div class="home__statusbar">
         <span class="home__statusbar-item">🕐 {{ clockText }}</span>
-        <span class="home__statusbar-item">💰 距发薪日 {{ paydayText }}</span>
         <span class="home__statusbar-item">🏖 距周末 {{ weekendText }}</span>
+        <span class="home__statusbar-item">🎉 距{{ holidayName }} {{ holidayText }}</span>
       </div>
 
       <!-- 多引擎搜索框 -->
@@ -205,6 +206,7 @@ function handleLogout() {
 function handleUserCommand(command: string) {
   if (command === 'center') router.push('/user-center');
   else if (command === 'feedback') router.push('/feedback');
+  else if (command === 'admin') router.push('/admin');
   else if (command === 'logout') handleLogout();
 }
 
@@ -269,7 +271,7 @@ const clockText = computed(() =>
 
 function countdownTo(target: Date): string {
   const diff = target.getTime() - Date.now();
-  if (diff <= 0) return '0天0时0分';
+  if (diff <= 0) return '今天';
   const days = Math.floor(diff / 86400000);
   const hours = Math.floor((diff % 86400000) / 3600000);
   const mins = Math.floor((diff % 3600000) / 60000);
@@ -286,15 +288,54 @@ function nextWeekend(): Date {
   return t;
 }
 
-function nextPayday(): Date {
-  const d = new Date();
-  const t = new Date(d.getFullYear(), d.getMonth(), 10, 0, 0, 0);
-  if (t.getTime() <= d.getTime()) t.setMonth(t.getMonth() + 1);
-  return t;
+/* 节假日列表（公历；农历节日如春节/端午/中秋请按年份更新公历日期） */
+interface Holiday {
+  name: string;
+  month: number;
+  day: number;
 }
 
-const weekendText = computed(() => countdownTo(nextWeekend()));
-const paydayText = computed(() => countdownTo(nextPayday()));
+const holidays: Holiday[] = [
+  { name: '元旦', month: 1, day: 1 },
+  { name: '春节', month: 2, day: 17 }, // 2026 正月初一，每年需更新
+  { name: '清明', month: 4, day: 5 },
+  { name: '劳动节', month: 5, day: 1 },
+  { name: '端午', month: 6, day: 19 }, // 2026 五月初五，每年需更新
+  { name: '中秋', month: 9, day: 25 }, // 2026 八月十五，每年需更新
+  { name: '国庆', month: 10, day: 1 },
+  { name: '圣诞', month: 12, day: 25 },
+];
+
+function nextHoliday(): Holiday & { date: Date } {
+  const now = new Date();
+  let best: (Holiday & { date: Date }) | null = null;
+  for (const h of holidays) {
+    let d = new Date(now.getFullYear(), h.month - 1, h.day, 0, 0, 0);
+    if (d.getTime() < now.getTime()) {
+      d = new Date(now.getFullYear() + 1, h.month - 1, h.day, 0, 0, 0);
+    }
+    if (!best || d.getTime() < best.date.getTime()) {
+      best = { ...h, date: d };
+    }
+  }
+  return best ?? { name: '元旦', month: 1, day: 1, date: new Date(now.getFullYear() + 1, 0, 1) };
+}
+
+/* 倒计时需依赖 now 每秒刷新 */
+const weekendText = computed(() => {
+  void now.value;
+  return countdownTo(nextWeekend());
+});
+
+const holidayInfo = computed(() => {
+  void now.value;
+  return nextHoliday();
+});
+const holidayName = computed(() => holidayInfo.value.name);
+const holidayText = computed(() => {
+  void now.value;
+  return countdownTo(holidayInfo.value.date);
+});
 
 function startClock() {
   clockTimer = setInterval(() => {
@@ -680,6 +721,10 @@ function dotStyle(n: number) {
 
 .app-card:hover .app-card__inner {
   transform: rotateY(180deg);
+}
+
+.app-card:active .app-card__inner {
+  transform: scale(0.97);
 }
 
 .app-card__face {

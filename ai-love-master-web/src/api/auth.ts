@@ -12,7 +12,8 @@ export interface LoginRequest {
 export interface RegisterRequest {
   username: string;
   password: string;
-  email?: string;
+  email: string;
+  code: string;
 }
 
 export interface AuthResponse {
@@ -27,4 +28,9 @@ export function login(data: LoginRequest) {
 
 export function register(data: RegisterRequest) {
   return http.post<any, ResultWrapper<null>>('/api/auth/register', data);
+}
+
+/** 发送注册邮箱验证码 */
+export function sendEmailCode(email: string) {
+  return http.post<any, ResultWrapper<null>>('/api/auth/send-code', { email });
 }

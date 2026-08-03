@@ -47,6 +47,34 @@
             autocomplete="new-password"
           />
         </el-form-item>
+        <el-form-item label="邮箱" prop="email">
+          <el-input
+            v-model="form.email"
+            placeholder="请输入邮箱（用于接收验证码）"
+            size="large"
+            :prefix-icon="Message"
+            autocomplete="email"
+          />
+        </el-form-item>
+        <el-form-item label="验证码" prop="code">
+          <div class="register-code">
+            <el-input
+              v-model="form.code"
+              placeholder="6位验证码"
+              size="large"
+              :prefix-icon="Key"
+              maxlength="6"
+            />
+            <el-button
+              size="large"
+              class="register-code__btn"
+              :disabled="countdown > 0 || !isEmailValid"
+              @click="handleSendCode"
+            >
+              {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
+            </el-button>
+          </div>
+        </el-form-item>
         <el-form-item>
           <el-button
             type="primary"
@@ -80,12 +108,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed, onBeforeUnmount } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { User, Lock } from '@element-plus/icons-vue';
+import { User, Lock, Message, Key } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { useAuthStore } from '../store/authStore';
 import { ElMessage } from 'element-plus';
+import { sendEmailCode } from '../api/auth';
 
 const router = useRouter();
 const route = useRoute();
@@ -97,6 +126,42 @@ const form = reactive({
   username: '',
   password: '',
   confirmPassword: '',
+  email: '',
+  code: '',
+});
+
+/** 邮箱格式校验（简单正则） */
+const EMAIL_RE = /^[\w.-]+@[\w-]+(\.[\w-]+)+$/;
+const isEmailValid = computed(() => EMAIL_RE.test(form.email.trim()));
+
+/** 验证码发送倒计时（秒） */
+const countdown = ref(0);
+let countdownTimer: ReturnType<typeof setInterval> | null = null;
+
+async function handleSendCode() {
+  if (!isEmailValid.value) {
+    ElMessage.warning('请先输入正确的邮箱地址');
+    return;
+  }
+  try {
+    await sendEmailCode(form.email.trim());
+    ElMessage.success('验证码已发送，请查收邮件');
+    countdown.value = 60;
+    if (countdownTimer) clearInterval(countdownTimer);
+    countdownTimer = setInterval(() => {
+      countdown.value -= 1;
+      if (countdown.value <= 0 && countdownTimer) {
+        clearInterval(countdownTimer);
+        countdownTimer = null;
+      }
+    }, 1000);
+  } catch {
+    // 错误提示由 http 拦截器处理（如：发送过于频繁）
+  }
+}
+
+onBeforeUnmount(() => {
+  if (countdownTimer) clearInterval(countdownTimer);
 });
 
 const validateConfirm = (_rule: unknown, value: string, callback: (e?: Error) => void) => {
@@ -117,6 +182,14 @@ const rules: FormRules = {
     { required: true, message: '请再次输入密码', trigger: 'blur' },
     { validator: validateConfirm, trigger: 'blur' },
   ],
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { pattern: EMAIL_RE, message: '邮箱格式不正确', trigger: 'blur' },
+  ],
+  code: [
+    { required: true, message: '请输入验证码', trigger: 'blur' },
+    { pattern: /^\d{6}$/, message: '验证码为6位数字', trigger: 'blur' },
+  ],
 };
 
 async function handleRegister() {
@@ -128,6 +201,8 @@ async function handleRegister() {
       await authStore.register({
         username: form.username,
         password: form.password,
+        email: form.email.trim(),
+        code: form.code.trim(),
       });
       ElMessage.success('注册成功，已自动登录，正在跳转…');
       const redirect = (route.query.redirect as string) || '/';
@@ -225,6 +300,24 @@ async function handleRegister() {
 
 .auth-form :deep(.el-input__wrapper) {
   border-radius: 10px;
+}
+
+/* 验证码行：输入框 + 获取按钮 */
+.register-code {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.register-code :deep(.el-input) {
+  flex: 1;
+}
+
+.register-code__btn {
+  flex-shrink: 0;
+  border-radius: 10px;
+  min-width: 120px;
+  font-weight: 500;
 }
 
 .auth-submit {

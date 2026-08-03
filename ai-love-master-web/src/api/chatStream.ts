@@ -1,7 +1,8 @@
 /**
  * SSE 流式接口（使用 fetch + ReadableStream，因 EventSource 不支持 POST）
  */
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+// 本地 dev 由 .env.development 指定；生产部署留空走同域（Netlify _redirects 代理 /api）
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 function getAuthHeader(): Record<string, string> {
   const token = localStorage.getItem('love_master_token');

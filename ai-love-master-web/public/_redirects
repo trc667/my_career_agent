@@ -1,1 +1,6 @@
+# API 反向代理：把 /api/* 转发到本地 cpolar 隧道（后端地址变更时只需改这里）
+# 注意：必须放在 SPA 回退 /* 之前，否则会被吞掉
+/api/*    https://6dd3eff9.r11.cpolar.top/api/:splat    200
+
+# SPA 回退：其他路径全部返回 index.html
 /*    /index.html   200

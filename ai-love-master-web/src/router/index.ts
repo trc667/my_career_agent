@@ -13,15 +13,19 @@ const router = createRouter({
     { path: '/user-center', name: 'user-center', component: () => import('../views/UserCenterView.vue'), meta: { title: '个人中心', requiresAuth: true } },
     { path: '/navigate', name: 'navigate', component: () => import('../views/NavigateView.vue'), meta: { title: '网站导航' } },
     { path: '/notice', name: 'notice', component: () => import('../views/NoticeView.vue'), meta: { title: '公告中心' } },
+    { path: '/admin', name: 'admin', component: () => import('../views/AdminView.vue'), meta: { title: '管理后台', requiresAuth: true, requiresAdmin: true } },
   ],
 });
 
 router.beforeEach((to, _from, next) => {
   const auth = useAuthStore();
   const needAuth = to.matched.some((r) => r.meta?.requiresAuth);
+  const needAdmin = to.matched.some((r) => r.meta?.requiresAdmin);
   const isAuthPage = to.name === 'login' || to.name === 'register';
   if (needAuth && !auth.isAuthenticated()) {
     next({ name: 'login', query: { redirect: to.fullPath } });
+  } else if (needAdmin && !auth.isAdmin()) {
+    next({ name: 'home' });
   } else if (isAuthPage && auth.isAuthenticated()) {
     next({ name: 'home' });
   } else {
