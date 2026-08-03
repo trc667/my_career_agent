@@ -65,6 +65,8 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* 防止装饰元素（光斑等）在窄屏造成横向滚动 */
+  overflow-x: hidden;
 }
 
 * {
@@ -132,5 +134,63 @@ body {
 @media (max-width: 767px) {
   html {
     font-size: 15px;
+  }
+
+  /* 弹窗自适应：手机端不超过屏幕宽度，且顶部留出安全距离 */
+  .el-dialog {
+    max-width: 92vw !important;
+    margin-top: 6vh !important;
+  }
+
+  /* 弹窗内容超高时可内部滚动，避免撑出屏幕 */
+  .el-dialog .el-dialog__body {
+    max-height: 60vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 弹窗内表单：label 移到顶部，避免 80/90px 的 label 挤占输入框 */
+  .el-dialog .el-form-item {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .el-dialog .el-form-item__label {
+    height: auto;
+    line-height: 1.5;
+    margin-bottom: 6px;
+    padding-bottom: 0;
+    text-align: left;
+    justify-content: flex-start;
+  }
+
+  .el-dialog .el-form-item__content {
+    margin-left: 0 !important;
+  }
+
+  /* 弹窗底部按钮组：手机上允许换行，避免按钮溢出 */
+  .el-dialog__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Element Plus 消息确认框同样限宽 */
+  .el-message-box {
+    max-width: 92vw !important;
+  }
+}
+
+/* ===== 触屏设备优化（无 hover） ===== */
+@media (hover: none) {
+  /* 隐藏依赖 hover 的提示 */
+  .app-card__hint {
+    display: none;
+  }
+
+  /* 触屏上禁止 3D 翻转残留，点击直接进入 */
+  .app-card:hover .app-card__inner {
+    transform: none;
   }
 }

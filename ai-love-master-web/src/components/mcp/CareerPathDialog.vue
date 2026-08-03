@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visibleLocal" title="学习路线规划" width="440px" :close-on-click-modal="false">
+  <el-dialog v-model="visibleLocal" title="学习路线规划" width="min(440px, 92vw)" :close-on-click-modal="false">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
       <el-form-item label="目标方向" prop="direction">
         <el-select v-model="form.direction" placeholder="请选择">

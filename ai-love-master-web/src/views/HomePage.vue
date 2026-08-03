@@ -146,7 +146,7 @@
     <el-dialog
       v-model="showNoticeDialog"
       title="📢 最新公告"
-      width="440px"
+      width="min(440px, 92vw)"
       :close-on-click-modal="true"
       align-center
     >
@@ -880,8 +880,27 @@ function dotStyle(n: number) {
     padding: 0 var(--app-space-md);
   }
 
+  /* 顶部导航：隐藏副标题与用户名，避免窄屏挤压 */
+  .home__brand-sub {
+    display: none;
+  }
+
+  .home__brand-name {
+    font-size: 16px;
+  }
+
+  .home__user-name {
+    display: none;
+  }
+
   .home__hero {
     padding: 36px 0 24px;
+  }
+
+  /* 快捷入口在小屏允许换行 */
+  .home__quick {
+    flex-wrap: wrap;
+    gap: var(--app-space-sm);
   }
 
   .home__search {

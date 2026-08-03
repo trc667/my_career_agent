@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visibleLocal" title="面试话术生成" width="420px" :close-on-click-modal="false">
+  <el-dialog v-model="visibleLocal" title="面试话术生成" width="min(420px, 92vw)" :close-on-click-modal="false">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
       <el-form-item label="场景" prop="scene">
         <el-select v-model="form.scene" placeholder="请选择">

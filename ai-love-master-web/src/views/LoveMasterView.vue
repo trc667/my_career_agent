@@ -1,5 +1,7 @@
 <template>
   <el-container class="chat-layout" :class="`theme-${theme}`">
+    <!-- 移动端侧栏遮罩：点击关闭 -->
+    <div v-if="isMobile && sidebarOpen" class="chat-layout__mask" @click="sidebarOpen = false"></div>
     <el-aside
       class="chat-layout__aside"
       width="280px"

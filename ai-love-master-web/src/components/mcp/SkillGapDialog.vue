@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visibleLocal" title="技能差距分析" width="520px" :close-on-click-modal="false">
+  <el-dialog v-model="visibleLocal" title="技能差距分析" width="min(520px, 92vw)" :close-on-click-modal="false">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
       <el-form-item label="岗位 JD" prop="jd">
         <el-input

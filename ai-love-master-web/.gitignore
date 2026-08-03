@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# 敏感配置：含后端隧道地址，不提交仓库（本地构建 dist 后部署即可）
+.env.production
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

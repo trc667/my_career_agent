@@ -64,7 +64,7 @@
     </main>
 
     <!-- 发布/编辑公告对话框 -->
-    <el-dialog v-model="annDialogVisible" :title="editingAnn ? '编辑公告' : '发布公告'" width="460px">
+    <el-dialog v-model="annDialogVisible" :title="editingAnn ? '编辑公告' : '发布公告'" width="min(460px, 92vw)">
       <el-form :model="annForm" label-position="top">
         <el-form-item label="标题">
           <el-input v-model="annForm.title" maxlength="128" placeholder="请输入公告标题" />
@@ -324,6 +324,27 @@ onMounted(loadAll);
 @media (max-width: 767px) {
   .admin-page {
     padding: 0 var(--app-space-md) 40px;
+  }
+
+  /* 表格在手机上保持横向滚动，不被挤压变形 */
+  .admin-tabs .el-table {
+    width: 100%;
+  }
+
+  .admin-tabs .el-table__body-wrapper {
+    overflow-x: auto;
+  }
+
+  /* 卡片头部：标题与时间在小屏允许换行 */
+  .admin-ann__head,
+  .admin-fb__head {
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+
+  .admin-ann__actions,
+  .admin-fb__actions {
+    text-align: left;
   }
 }
 </style>

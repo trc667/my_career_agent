@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visibleLocal" title="备考计划制定" width="440px" :close-on-click-modal="false">
+  <el-dialog v-model="visibleLocal" title="备考计划制定" width="min(440px, 92vw)" :close-on-click-modal="false">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
       <el-form-item label="目标" prop="goal">
         <el-select v-model="form.goal" placeholder="请选择">

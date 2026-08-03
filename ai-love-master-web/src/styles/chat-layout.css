@@ -68,6 +68,14 @@
 }
 
 @media (max-width: 767px) {
+  /* 移动端侧栏遮罩 */
+  .chat-layout__mask {
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+    background: rgba(0, 0, 0, 0.45);
+  }
+
   .chat-layout__aside {
     position: fixed;
     left: 0;
@@ -80,6 +88,19 @@
 
   .chat-layout__header {
     padding: var(--app-space-md);
+  }
+
+  /* 手机端隐藏昵称，只保留头像和退出，避免标题挤压 */
+  .chat-header__nickname {
+    display: none;
+  }
+
+  .chat-header__title {
+    font-size: 15px;
+  }
+
+  .chat-header__right .el-avatar {
+    margin-left: auto;
   }
 
   .chat-layout__main {
