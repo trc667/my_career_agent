@@ -2,7 +2,12 @@
  * SSE 流式接口（使用 fetch + ReadableStream，因 EventSource 不支持 POST）
  */
 // 本地 dev 由 .env.development 指定；生产部署留空走同域（Netlify _redirects 代理 /api）
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+// 重要：生产环境流式接口优先使用 VITE_STREAM_BASE_URL 直连后端，
+// 因为 Netlify 的 _redirects 代理会缓冲 SSE 响应，导致内容晚到甚至被截断丢失。
+const API_BASE =
+  import.meta.env.VITE_STREAM_BASE_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  '';
 
 function getAuthHeader(): Record<string, string> {
   const token = localStorage.getItem('love_master_token');
