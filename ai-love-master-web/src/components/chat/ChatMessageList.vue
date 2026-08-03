@@ -13,7 +13,15 @@
       <div class="chat-list__bubble">
         <ThinkingSteps v-if="m.role === 'assistant' && m.steps?.length" :steps="m.steps" />
         <div class="chat-list__content">
-          {{ streamingContent != null && m === messages[messages.length - 1] && m.role === 'assistant' ? streamingContent : m.content }}<span
+          <div
+            class="chat-md"
+            v-html="renderMarkdown(
+              streamingContent != null && m === messages[messages.length - 1] && m.role === 'assistant'
+                ? streamingContent
+                : m.content,
+            )"
+          ></div>
+          <span
             v-if="
               m.role === 'assistant' &&
               typing &&
@@ -32,6 +40,7 @@
 import { nextTick, ref, watch } from 'vue';
 import type { ChatMessage } from '../../store/chatStore';
 import ThinkingSteps from './ThinkingSteps.vue';
+import { renderMarkdown } from '../../utils/markdown';
 
 const props = defineProps<{
   messages: ChatMessage[];
@@ -80,10 +89,103 @@ watch(
 }
 
 .chat-list__content {
-  white-space: pre-wrap;
   word-break: break-word;
   font-size: 14px;
   line-height: 1.55;
+}
+
+/* AI 回复的 Markdown 渲染样式 */
+.chat-md {
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.chat-md :deep(p) {
+  margin: 6px 0;
+}
+
+.chat-md :deep(p:first-child) {
+  margin-top: 0;
+}
+
+.chat-md :deep(h1),
+.chat-md :deep(h2),
+.chat-md :deep(h3),
+.chat-md :deep(h4) {
+  margin: 12px 0 6px;
+  font-size: 1.08em;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.chat-md :deep(ul),
+.chat-md :deep(ol) {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.chat-md :deep(li) {
+  margin: 3px 0;
+}
+
+.chat-md :deep(code) {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.chat-md :deep(pre) {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.chat-md :deep(pre code) {
+  background: none;
+  padding: 0;
+}
+
+.chat-md :deep(blockquote) {
+  margin: 6px 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--app-border);
+  color: var(--app-text-secondary);
+}
+
+.chat-md :deep(a) {
+  color: var(--app-accent-blue);
+  text-decoration: none;
+}
+
+.chat-md :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.chat-md :deep(strong) {
+  font-weight: 700;
+}
+
+.chat-md :deep(table) {
+  border-collapse: collapse;
+  margin: 8px 0;
+  width: 100%;
+}
+
+.chat-md :deep(th),
+.chat-md :deep(td) {
+  border: 1px solid var(--app-border);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+/* 暗色主题下代码块/行内代码底色加深 */
+.theme-dark .chat-md :deep(code),
+.theme-dark .chat-md :deep(pre) {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .chat-list__cursor {
