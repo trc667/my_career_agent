@@ -1,0 +1,120 @@
+/* 全局样式：统一设计变量、响应式、PC/移动端兼容 */
+
+:root {
+  --app-bg: #f0f2f5;
+  --app-bg-deep: #e8ebf0;
+  --app-text: #303133;
+  --app-text-secondary: #909399;
+  --app-border: #e4e7ed;
+  --app-card: #ffffff;
+
+  /* 统一间距 */
+  --app-space-xs: 4px;
+  --app-space-sm: 8px;
+  --app-space-md: 12px;
+  --app-space-lg: 16px;
+  --app-space-xl: 24px;
+  --app-space-2xl: 40px;
+
+  /* 圆角（大圆角卡片，参考现代导航站风格） */
+  --app-radius-sm: 8px;
+  --app-radius-md: 12px;
+  --app-radius-lg: 20px;
+
+  /* 响应式断点（配合媒体查询使用） */
+  --app-sidebar-width: 280px;
+  --app-content-max: 900px;
+
+  /* 聊天气泡：用户=中性灰蓝，AI=浅蓝 */
+  --chat-user-bg: #f0f2f5;
+  --chat-assistant-bg: #f0f7ff;
+  --chat-assistant-border: rgba(64, 158, 255, 0.25);
+
+  /* 强调色（卡片点缀） */
+  --app-accent-orange: rgb(255, 170, 92);
+  --app-accent-red: rgb(255, 92, 92);
+  --app-accent-blue: rgb(64, 158, 255);
+}
+
+.theme-dark {
+  --app-bg: #121417;
+  --app-bg-deep: #0d0f12;
+  --app-text: #e5eaf3;
+  --app-text-secondary: #8f9bb3;
+  --app-border: #2c323d;
+  --app-card: #1a1e26;
+  --chat-user-bg: rgba(64, 158, 255, 0.15);
+  --chat-assistant-bg: rgba(64, 158, 255, 0.08);
+  --chat-assistant-border: rgba(64, 158, 255, 0.3);
+}
+
+html {
+  font-size: 16px;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ===== 通用动效工具类（首页 / 登录页共用） ===== */
+@keyframes app-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes app-fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes app-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes app-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 背景装饰：柔和光斑（首页/登录页） */
+.app-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  pointer-events: none;
+  animation: app-float 8s ease-in-out infinite;
+}
+
+.app-orb--blue {
+  background: rgba(64, 158, 255, 0.22);
+}
+
+.app-orb--orange {
+  background: rgba(230, 162, 60, 0.2);
+}
+
+.app-orb--purple {
+  background: rgba(114, 100, 240, 0.18);
+}
+
+/* 响应式工具类（供组件引用） */
+@media (max-width: 767px) {
+  html {
+    font-size: 15px;
+  }
+}

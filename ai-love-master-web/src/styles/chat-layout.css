@@ -1,0 +1,94 @@
+/**
+ * 聊天页面公共样式 - 职规大师 / 超级智能体 共用
+ * 统一风格、PC/移动端响应式
+ */
+.chat-layout {
+  height: 100%;
+  background: var(--app-bg);
+}
+
+.chat-layout__aside {
+  width: var(--app-sidebar-width, 280px);
+  border-right: 1px solid var(--app-border);
+  background: var(--app-card);
+  overflow-y: auto;
+}
+
+.chat-layout__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--app-space-md) var(--app-space-lg);
+  border-bottom: 1px solid var(--app-border);
+  background: var(--app-card);
+  min-height: 52px;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.04);
+}
+
+.chat-header__left {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-md);
+}
+
+.chat-header__back {
+  font-size: 14px;
+  color: var(--el-color-primary);
+  text-decoration: none;
+}
+
+.chat-header__back:hover {
+  text-decoration: underline;
+}
+
+.chat-header__title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.chat-header__right {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-sm);
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.chat-layout__main {
+  padding: var(--app-space-lg);
+  overflow: auto;
+}
+
+.chat-layout__footer {
+  padding: var(--app-space-md) var(--app-space-lg);
+  /* 底部留出安全区，防止发送按钮被系统栏/浏览器底部遮挡 */
+  padding-bottom: calc(var(--app-space-md) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--app-border);
+  background: var(--app-card);
+}
+
+@media (max-width: 767px) {
+  .chat-layout__aside {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: min(320px, 85vw) !important;
+    z-index: 100;
+    box-shadow: 2px 0 12px rgba(0 0 0 / 0.15);
+  }
+
+  .chat-layout__header {
+    padding: var(--app-space-md);
+  }
+
+  .chat-layout__main {
+    padding: var(--app-space-md);
+  }
+
+  .chat-layout__footer {
+    padding: var(--app-space-md);
+    /* 移动端加大底部留白，防止发送按钮被浏览器底部栏遮挡 */
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+}

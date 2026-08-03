@@ -1,0 +1,6 @@
+{
+  "envId": "请替换为你的云开发环境ID",
+  "hosting": {
+    "ignore": [".git", "node_modules"]
+  }
+}
