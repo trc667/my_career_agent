@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="AiLoveMasterApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="ai-career-master" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.example.aimaster.AiLoveMasterApplication" />
+    <option name="ACTIVE_PROFILES" value="dev" />
+    <option name="VM_PARAMETERS" value="-Xmx512m -Xms256m -XX:MaxMetaspaceSize=128m -Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8" />
+    <method v="2">
+      <option name="Maven.BEFORE_LAUNCH" enabled="false" />
+    </method>
+  </configuration>
+</component>

@@ -1,0 +1,82 @@
+# 本地默认 8080；Render 等平台会注入 PORT，必须读环境变量
+server:
+  port: ${PORT:8080}
+
+spring:
+  profiles:
+    active: dev
+  application:
+    name: ai-career-master
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/ai_love_master?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  ai:
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:your-dashscope-api-key}
+      chat:
+        options:
+          model: qwen-plus
+          temperature: 0.8
+          max-tokens: 2048
+
+# MyBatis-Plus（登录/注册用）
+mybatis-plus:
+  type-aliases-package: com.example.aimaster.entity
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+# 计算机学生职规大师 + 认证配置
+app:
+  jwt:
+    secret: ${JWT_SECRET:ai-love-master-dev-secret-change-in-production}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  cors:
+    # 含 Netlify（https://*.netlify.app 匹配任意子域名预览/部署）；生产可用 CORS_ALLOWED_ORIGINS 覆盖
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5175,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:5175,http://127.0.0.1:3000,https://*.netlify.app}
+  # 职规大师智能体（可选覆盖）
+  career-master:
+    # 是否启用流式响应
+    stream-enabled: true
+  # 控制台交互：启用后可在运行应用的终端里输入问题，AI 在终端回复
+  console:
+    enabled: false
+  # 多轮对话记忆（文件持久化，重启不丢）
+  memory:
+    type: file
+    max-messages-per-conversation: 20
+    file:
+      base-dir: ./data/chat-memory
+  # RAG 文档切割
+  rag:
+    chunk-size: 500
+    min-chunk-size-chars: 100
+    keep-separator: false
+  # 文件保存工具：职业规划、技能清单等保存目录
+  file-save:
+    base-dir: ${FILE_SAVE_DIR:./data/files}
+  # 超级智能体 ReAct 流式
+  react-stream:
+    tools-enabled: true
+    mcp-enabled: true
+    typing-delay-ms: 40
+    step-timeout-ms: 120000   # 单步 120 秒，避免 DashScope 慢响应时超时
+  # 敏感词过滤（输入/输出合规）
+  sensitive-word:
+    enabled: true
+    words-file: classpath:sensitive-words.txt
+    replacement: "***"
+
+# Resilience4j 限流：每分钟 20 次，超限立即拒绝
+resilience4j:
+  ratelimiter:
+    instances:
+      chatLimiter:
+        limitForPeriod: ${RATE_LIMIT_PER_MINUTE:20}
+        limitRefreshPeriod: 60s
+        timeoutDuration: 0   # 不等待，超限直接 429
+

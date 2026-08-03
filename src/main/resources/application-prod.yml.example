@@ -1,0 +1,20 @@
+# 生产环境配置示例（复制为 application-prod.yml 或直接使用环境变量）
+# 启动: --spring.profiles.active=prod
+#
+# 必须设置的环境变量:
+#   DASHSCOPE_API_KEY          - 阿里云灵积 API Key（必填）
+#
+# 可选环境变量（有默认值）:
+#   SERVER_PORT                - 服务端口，默认 8080
+#   AMAP_MCP_KEY               - 高德 MCP Key，不设则 MCP 地图功能不可用
+#   MCP_ENABLED                - 是否启用 MCP 工具，默认 false（生产建议关闭，避免 Node 依赖）
+#   APP_MEMORY_BASE_DIR        - 对话记忆存储目录，默认 ./data/chat-memory
+#   APP_CORS_ALLOWED_ORIGINS   - 允许跨域的前端地址，逗号分隔
+#
+# 示例（Linux/Mac）:
+#   export DASHSCOPE_API_KEY=sk-xxx
+#   export AMAP_MCP_KEY=your-amap-key
+#   java -jar ai-love-master.jar --spring.profiles.active=prod
+#
+# 示例（Docker）:
+#   docker run -e DASHSCOPE_API_KEY=sk-xxx -e AMAP_MCP_KEY=xxx -p 8080:8080 your-image

@@ -1,0 +1,42 @@
+# Maven
+target/
+pom.xml.tag
+pom.releaseBackup
+
+# IDE
+.idea/
+*.iml
+.vscode/*
+!.vscode/launch.json
+*.class
+
+# Spring：真实密钥只放 application-dev.yml（由 application-dev.yml.example 复制生成，勿提交）
+application-dev.yml
+*-local.yml
+
+# 本地数据（对话记录等）
+data/
+
+# 前端依赖
+ai-love-master-web/node_modules/
+ai-love-master-web/.vite/
+ai-love-master-web/dist/
+
+# Logs
+*.log
+logs/
+
+# 测试脚本输出
+reply.txt
+query
+
+# 前端 env、部署包（避免泄露 API 等）
+ai-love-master-web/.env.development
+ai-love-master-web/.env.production
+ai-love-master-web/deploy.zip
+ai-love-master-web/test-auth.json
+ai-love-master-web/_deploy_extract/
+
+# OS
+.DS_Store
+Thumbs.db

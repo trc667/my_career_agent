@@ -1,0 +1,4 @@
+# 控制台交互默认关闭，只用浏览器访问即可；若要在终端里对话，可改为 true 或启动时加 --app.console.enabled=true
+app:
+  console:
+    enabled: false

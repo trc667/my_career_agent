@@ -1,0 +1,94 @@
+# 生产环境配置：所有敏感信息必须通过环境变量传入，禁止在此文件写死密钥
+
+# Render 注入 PORT；也可用 SERVER_PORT（Docker 等）
+server:
+  port: ${PORT:${SERVER_PORT:8080}}
+
+spring:
+  main:
+    banner-mode: off
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  ai:
+    dashscope:
+      # 必须设置环境变量 DASHSCOPE_API_KEY
+      api-key: ${DASHSCOPE_API_KEY}
+      chat:
+        options:
+          model: ${DASHSCOPE_MODEL:qwen-plus}
+          temperature: ${DASHSCOPE_TEMPERATURE:0.8}
+          max-tokens: ${DASHSCOPE_MAX_TOKENS:2048}
+      embedding:
+        options:
+          model: ${DASHSCOPE_EMBEDDING_MODEL:text-embedding-v4}
+    mcp:
+      client:
+        enabled: ${MCP_ENABLED:false}
+        request-timeout: 180s
+        type: SYNC
+        stdio:
+          connections:
+            amap:
+              command: npx
+              args: ["-y", "@amap/amap-maps-mcp-server"]
+              env:
+                AMAP_MAPS_API_KEY: ${AMAP_MCP_KEY}
+                LANG: C.UTF-8
+                LC_ALL: C.UTF-8
+            web-search:
+              command: npx
+              args: ["-y", "@zhafron/mcp-web-search"]
+              env:
+                DEFAULT_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:duckduckgo}
+                LANG: C.UTF-8
+                LC_ALL: C.UTF-8
+            pdf:
+              command: npx
+              args: ["-y", "@mcp-z/mcp-pdf"]
+              env:
+                LANG: C.UTF-8
+                LC_ALL: C.UTF-8
+            file-manager:
+              command: npx
+              args: ["-y", "@mcpcn/mcp-file-manager"]
+              env:
+                LANG: C.UTF-8
+                LC_ALL: C.UTF-8
+
+# 高德 MCP Key，仅在 MCP_ENABLED=true 时需配置
+amap:
+  mcp:
+    key: ${AMAP_MCP_KEY:}
+
+# 计算机学生职规大师智能体
+app:
+  career-master:
+    stream-enabled: true
+  console:
+    enabled: false
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  memory:
+    type: file
+    max-messages-per-conversation: 20
+    file:
+      base-dir: ${MEMORY_BASE_DIR:./data/chat-memory}
+  rag:
+    chunk-size: ${RAG_CHUNK_SIZE:500}
+    min-chunk-size-chars: 100
+    keep-separator: false
+  file-save:
+    base-dir: ${FILE_SAVE_DIR:./data/files}
+  react-stream:
+    tools-enabled: ${REACT_TOOLS_ENABLED:true}
+    mcp-enabled: ${MCP_ENABLED:false}
+    typing-delay-ms: 40
+    step-timeout-ms: ${REACT_STEP_TIMEOUT_MS:120000}
+
+logging:
+  level:
+    root: INFO
+    com.example.aimaster: INFO

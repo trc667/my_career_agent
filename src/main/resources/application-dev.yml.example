@@ -1,0 +1,57 @@
+# =============================================================================
+# 新电脑 / 新克隆：复制本文件为 application-dev.yml 后再启动（不入库，避免误提交密钥）
+#
+#   Windows:  powershell -ExecutionPolicy Bypass -File .\scripts\setup-dev-yml.ps1
+#   或手动:   copy 本文件为同目录下的 application-dev.yml
+#
+# 密钥二选一：在下面填写占位符，或设置环境变量 DASHSCOPE_API_KEY、AMAP_MCP_KEY
+# =============================================================================
+spring:
+  sql:
+    init:
+      mode: always
+  ai:
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:REPLACE_WITH_YOUR_DASHSCOPE_KEY}
+    mcp:
+      client:
+        enabled: true
+        request-timeout: 180s
+        type: SYNC
+        stdio:
+          connections:
+            amap:
+              # Windows 若找不到命令，可改为完整路径，例如: D:\nodejs\npx.cmd
+              command: npx
+              args: ["-y", "@amap/amap-maps-mcp-server"]
+              env:
+                AMAP_MAPS_API_KEY: ${AMAP_MCP_KEY:${amap.mcp.key:}}
+                LANG: C.UTF-8
+                LC_ALL: C.UTF-8
+            web-search:
+              command: npx
+              args: ["-y", "@zhafron/mcp-web-search"]
+              env:
+                DEFAULT_SEARCH_PROVIDER: duckduckgo
+                LANG: C.UTF-8
+                LC_ALL: C.UTF-8
+            pdf:
+              command: npx
+              args: ["-y", "@mcp-z/mcp-pdf"]
+              env:
+                LANG: C.UTF-8
+                LC_ALL: C.UTF-8
+            file-manager:
+              command: npx
+              args: ["-y", "@mcpcn/mcp-file-manager"]
+              env:
+                LANG: C.UTF-8
+                LC_ALL: C.UTF-8
+
+amap:
+  mcp:
+    key: ${AMAP_MCP_KEY:REPLACE_WITH_YOUR_AMAP_WEB_KEY}
+
+app:
+  react-stream:
+    mcp-enabled: true

@@ -1,0 +1,12 @@
+# 不打包进镜像
+target/
+data/
+*.log
+.git/
+.idea/
+*.iml
+.vscode/
+application-dev.yml
+*-local.yml
+node_modules/
+ai-love-master-web/

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <!-- 强制控制台输出 UTF-8，解决 Windows 下中文乱码 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <charset>${log.console.charset:-UTF-8}</charset>
+            <pattern>${CONSOLE_LOG_PATTERN:-%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level %processId --- [%thread] %logger{36} : %msg%n}</pattern>
+        </encoder>
+    </appender>
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
