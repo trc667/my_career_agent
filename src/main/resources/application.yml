@@ -12,6 +12,18 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:root}
     password: ${SPRING_DATASOURCE_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  # 邮件发送（注册验证码）：QQ 邮箱 SMTP，密码处填「授权码」而非登录密码
+  mail:
+    host: ${MAIL_HOST:smtp.qq.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          ssl:
+            enable: true
+        debug: false
   ai:
     dashscope:
       api-key: ${DASHSCOPE_API_KEY:your-dashscope-api-key}
@@ -32,6 +44,9 @@ mybatis-plus:
 
 # 计算机学生职规大师 + 认证配置
 app:
+  # 管理员账号：启动时将该用户名提升为 ADMIN（可改环境变量 APP_ADMIN_USERNAME）
+  admin:
+    username: ${APP_ADMIN_USERNAME:demo}
   jwt:
     secret: ${JWT_SECRET:ai-love-master-dev-secret-change-in-production}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}

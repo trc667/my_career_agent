@@ -13,4 +13,7 @@ public class AuthResponse {
 
     private String token;
     private String username;
+
+    /** 用户角色：USER / ADMIN */
+    private String role;
 }

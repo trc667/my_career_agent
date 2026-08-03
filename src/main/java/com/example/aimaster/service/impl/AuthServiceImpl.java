@@ -8,6 +8,8 @@ import com.example.aimaster.exception.BusinessException;
 import com.example.aimaster.mapper.UserMapper;
 import com.example.aimaster.security.JwtUtil;
 import com.example.aimaster.service.AuthService;
+import com.example.aimaster.service.EmailCodeService;
+import com.example.aimaster.service.LoginAttemptService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,13 +29,19 @@ public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final EmailCodeService emailCodeService;
+    private final LoginAttemptService loginAttemptService;
 
     public AuthServiceImpl(UserMapper userMapper,
                           PasswordEncoder passwordEncoder,
-                          JwtUtil jwtUtil) {
+                          JwtUtil jwtUtil,
+                          EmailCodeService emailCodeService,
+                          LoginAttemptService loginAttemptService) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.emailCodeService = emailCodeService;
+        this.loginAttemptService = loginAttemptService;
     }
 
     /**
@@ -42,19 +50,21 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     public AuthResponse login(LoginRequest req) {
-        // TODO: 1. 用 userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, req.getUsername())) 查用户
+        // 防爆破：锁定检查
+        loginAttemptService.checkLocked(req.getUsername());
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, req.getUsername()));
         if (user == null) {
             throw new BusinessException("用户名或密码错误");
         }
         boolean matches = passwordEncoder.matches(req.getPassword(), user.getPasswordHash());
         if (!matches) {
+            loginAttemptService.recordFailure(req.getUsername());
             throw new BusinessException("用户名或密码错误");
         }
-        // TODO: 4. 用 jwtUtil.generateToken(user.getUsername()) 生成 token
-        String token = jwtUtil.generateToken(user.getUsername());
-        // TODO: 5. 返回 AuthResponse.builder().token(token).username(user.getUsername()).build()
-        return AuthResponse.builder().token(token).username(user.getUsername()).build();
+        loginAttemptService.reset(req.getUsername());
+        String role = user.getRole() != null ? user.getRole() : "USER";
+        String token = jwtUtil.generateToken(user.getUsername(), role);
+        return AuthResponse.builder().token(token).username(user.getUsername()).role(role).build();
     }
 
     /**
@@ -63,14 +73,26 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     public void register(RegisterRequest req) {
+        // 用户名唯一性
         User existingUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, req.getUsername()));
         if (existingUser != null) {
             throw new BusinessException("用户名已存在");
         }
+        // 邮箱唯一性
+        String email = req.getEmail().trim().toLowerCase();
+        User emailUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getEmail, email));
+        if (emailUser != null) {
+            throw new BusinessException("该邮箱已被注册");
+        }
+        // 校验邮箱验证码
+        emailCodeService.validate(email, req.getCode());
+
         String encode = passwordEncoder.encode(req.getPassword());
         User user = new User();
         user.setUsername(req.getUsername());
         user.setPasswordHash(encode);
+        user.setEmail(email);
+        user.setRole("USER");
         user.setCreateTime(LocalDateTime.now());
         user.setUpdateTime(LocalDateTime.now());
         userMapper.insert(user);

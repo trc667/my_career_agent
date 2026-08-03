@@ -49,6 +49,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**", "/api/health", "/api/debug/**", "/api/announcement/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS).permitAll()
                         .requestMatchers("/error", "/", "/*.html", "/*.js", "/*.css", "/favicon.ico").permitAll()
+                        // 管理接口：仅 ADMIN 角色可访问
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

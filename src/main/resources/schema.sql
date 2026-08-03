@@ -5,9 +5,32 @@ CREATE TABLE IF NOT EXISTS app_user (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(64) NOT NULL UNIQUE,
     password_hash VARCHAR(128) NOT NULL,
+    email VARCHAR(128) DEFAULT NULL,
+    role VARCHAR(16) DEFAULT 'USER',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_user_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 兼容已存在的 app_user 表：若缺少 email 列则补充（MySQL 5.7 动态 DDL）
+SET @has_email := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'app_user' AND COLUMN_NAME = 'email');
+SET @ddl := IF(@has_email = 0,
+    'ALTER TABLE app_user ADD COLUMN email VARCHAR(128) DEFAULT NULL, ADD UNIQUE KEY uk_user_email (email)',
+    'SELECT 1');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 兼容已存在的 app_user 表：若缺少 role 列则补充
+SET @has_role := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'app_user' AND COLUMN_NAME = 'role');
+SET @ddl2 := IF(@has_role = 0,
+    'ALTER TABLE app_user ADD COLUMN role VARCHAR(16) DEFAULT ''USER''',
+    'SELECT 1');
+PREPARE stmt2 FROM @ddl2;
+EXECUTE stmt2;
+DEALLOCATE PREPARE stmt2;
 
 -- 意见反馈表
 CREATE TABLE IF NOT EXISTS feedback (

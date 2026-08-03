@@ -34,8 +34,14 @@ public class JwtUtil {
     }
 
     public String generateToken(String username) {
+        return generateToken(username, "USER");
+    }
+
+    /** 生成 Token，附带角色 claim（USER / ADMIN） */
+    public String generateToken(String username, String role) {
         return Jwts.builder()
                 .subject(username)
+                .claim("role", role != null ? role : "USER")
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(getSigningKey())
@@ -44,6 +50,11 @@ public class JwtUtil {
 
     public String extractUsername(String token) {
         return parseClaims(token).getSubject();
+    }
+
+    public String extractRole(String token) {
+        Object role = parseClaims(token).get("role");
+        return role != null ? role.toString() : "USER";
     }
 
     public boolean validateToken(String token, String username) {

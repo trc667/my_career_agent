@@ -1,10 +1,13 @@
 package com.example.aimaster.controller;
 
 import com.example.aimaster.dto.AuthResponse;
+import com.example.aimaster.dto.EmailCodeRequest;
 import com.example.aimaster.dto.LoginRequest;
 import com.example.aimaster.dto.RegisterRequest;
 import com.example.aimaster.dto.Result;
 import com.example.aimaster.service.AuthService;
+import com.example.aimaster.service.EmailCodeService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -12,17 +15,19 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 认证接口：登录、注册，返回 JWT。
- * Controller 只做参数接收和返回封装，业务逻辑在 AuthServiceImpl。
+ * 认证接口：登录、注册（含邮箱验证码）、发送验证码。
+ * Controller 只做参数接收和返回封装，业务逻辑在 Service。
  */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
     private final AuthService authService;
+    private final EmailCodeService emailCodeService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, EmailCodeService emailCodeService) {
         this.authService = authService;
+        this.emailCodeService = emailCodeService;
     }
 
     @PostMapping("/login")
@@ -35,5 +40,12 @@ public class AuthController {
     public Result<Void> register(@Valid @RequestBody RegisterRequest req) {
         authService.register(req);
         return Result.ok("注册成功", null);
+    }
+
+    /** 发送注册邮箱验证码（带 IP 级频率限制） */
+    @PostMapping("/send-code")
+    public Result<Void> sendCode(@Valid @RequestBody EmailCodeRequest req, HttpServletRequest request) {
+        emailCodeService.sendCode(req.getEmail(), request.getRemoteAddr());
+        return Result.ok("验证码已发送，请查收邮件", null);
     }
 }

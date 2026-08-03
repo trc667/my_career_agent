@@ -32,6 +32,14 @@ public class User {
     @TableField("password_hash")
     private String passwordHash;
 
+    /** 注册邮箱（邮箱验证码注册，可空兼容旧用户） */
+    @TableField("email")
+    private String email;
+
+    /** 角色：USER / ADMIN（默认 USER） */
+    @TableField("role")
+    private String role;
+
     @TableField("created_at")
     private LocalDateTime createTime;
 

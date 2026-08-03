@@ -40,3 +40,7 @@ ai-love-master-web/_deploy_extract/
 # OS
 .DS_Store
 Thumbs.db
+
+# xyhm 站点分析临时截图（勿提交）
+xyhm*.png
+explore_xyhm*.png
