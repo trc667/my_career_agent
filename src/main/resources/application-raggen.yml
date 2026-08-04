@@ -1,0 +1,24 @@
+# =============================================================================
+# RAG 知识库批量生成专用配置（开发工具 profile，不影响 dev/prod 正常启动）
+#
+# 运行方式（PowerShell，需先设置 DASHSCOPE_API_KEY）：
+#   mvn spring-boot:run "-Dspring-boot.run.arguments=--spring.profiles.active=raggen"
+#
+# merge-to-kb: true 时生成完成后自动合并进 src/main/resources/rag/career-tips.txt
+# （本次扩容目标：228 → 588 段，验证数据量增大后混合检索优势趋势）
+# =============================================================================
+spring:
+  ai:
+    # 生成场景不需要 MCP 工具，关闭以加快启动、避免 npx 子进程
+    mcp:
+      client:
+        enabled: false
+
+app:
+  rag-gen:
+    # 注意：topics 必须用逗号分隔字符串（@Value 不支持注入 YAML list）
+    topics: "JVM 内存与性能调优实战,系统设计场景题,消息队列原理与面试题,AI 大模型方向求职与学习路线,Java 集合框架源码深入,Java 基础语法高频面试题,Java IO NIO 与 Netty 面试题,计算机网络协议深入面试题,操作系统内核与内存管理面试题,MySQL 索引与性能优化实战,Redis 高级应用与集群面试题,分布式理论 CAP 与一致性面试题,微服务架构组件面试题,Docker 容器化与 Kubernetes 面试题,设计模式在框架源码中的应用,数据结构与算法高频面试题,高并发秒杀与系统设计,ZooKeeper Elasticsearch MongoDB 面试题,前端 JavaScript 与框架原理面试题,大数据 Hadoop Spark Flink 技术栈,职场晋升与技术管理,行为面试与 HR 面进阶,项目经验与 STAR 表达技巧,各年级计算机学习规划与竞赛"
+    per-topic-count: 15
+    batch-size: 6
+    output-file: target/generated-knowledge.txt
+    merge-to-kb: true
