@@ -9,7 +9,10 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("dev")
+// 修复：原 @Profile("dev") 导致生产环境部署时不加载知识库，RAG 静默失效。
+// 现在 dev/prod 环境都会在启动时初始化知识库（向量化入库到 pgvector）。
+// 面试可讲：Spring @Profile 控制 Bean 装配，不同环境 profile 的行为差异。
+@Profile({"dev", "prod"})
 @Order(998)
 public class RagInitRunner implements ApplicationRunner {
 

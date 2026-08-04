@@ -39,6 +39,19 @@
             <artifactId>spring-ai-vector-store</artifactId>
             <version>1.0.1</version>
         </dependency>
+        <!-- pgvector 向量存储：RAG 知识库落盘 PostgreSQL，替换内存版 SimpleVectorStore
+             注：Spring AI 1.0.x 的 pgvector 实现模块名为 spring-ai-pgvector-store（含 PgVectorStore 类） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-pgvector-store</artifactId>
+            <version>1.0.1</version>
+        </dependency>
+        <!-- PostgreSQL 驱动（向量库专用数据源） -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
         <!-- 高德地图 MCP 客户端，与 Spring AI 1.0.1 对齐 -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
