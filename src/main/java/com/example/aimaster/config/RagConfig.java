@@ -70,7 +70,9 @@ public class RagConfig {
 
     @Bean
     public RagDocumentLoader ragDocumentLoader(VectorStore vectorStore,
-                                               TextSplitter textSplitter) {
-        return new RagDocumentLoader(vectorStore, textSplitter);
+                                               TextSplitter textSplitter,
+                                               @Qualifier("vectorDataSource") DataSource vectorDataSource) {
+        // JdbcTemplate 用于入库前 TRUNCATE 清空向量表（vectorDataSource 是 PostgreSQL 向量库数据源）
+        return new RagDocumentLoader(vectorStore, textSplitter, new JdbcTemplate(vectorDataSource));
     }
 }

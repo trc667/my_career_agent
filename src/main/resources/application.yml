@@ -72,10 +72,10 @@ app:
     max-messages-per-conversation: 20
     file:
       base-dir: ./data/chat-memory
-  # RAG 文档切割
+  # RAG 文档切割（优化后：250 token/块减少发散，60 字下限防过碎）
   rag:
-    chunk-size: 500
-    min-chunk-size-chars: 100
+    chunk-size: 250
+    min-chunk-size-chars: 60
     keep-separator: false
   # 文件保存工具：职业规划、技能清单等保存目录
   file-save:
