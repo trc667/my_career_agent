@@ -17,6 +17,7 @@ import com.example.aimaster.rag.RagDocumentLoader;
 import com.example.aimaster.service.CareerMasterService;
 import com.example.aimaster.tool.FileTool;
 import com.example.aimaster.tool.LoggingToolCallback;
+import com.example.aimaster.rag.HybridRetriever;
 import com.example.aimaster.tool.NoteTool;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -33,6 +34,7 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.model.StreamingChatModel;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.document.Document;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.support.ToolCallbacks;
@@ -45,6 +47,9 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 
 import reactor.core.publisher.Flux;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 计算机学生职规大师智能体服务实现（业务层）。
@@ -71,6 +76,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
     private final String systemPrompt;
     private final ConversationMemoryStore memoryStore;
     private final RagDocumentLoader ragDocumentLoader;
+    private final HybridRetriever hybridRetriever;
     private final SyncMcpToolCallbackProvider mcpToolCallbackProvider;
     private final NoteTool noteTool;
     private final FileTool fileTool;
@@ -87,6 +93,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             @Qualifier("careerMasterSystemPrompt") String systemPrompt,
             ConversationMemoryStore memoryStore,
             RagDocumentLoader ragDocumentLoader,
+            HybridRetriever hybridRetriever,
             @Autowired(required = false) SyncMcpToolCallbackProvider mcpToolCallbackProvider,
             @Autowired(required = false) NoteTool noteTool,
             @Autowired(required = false) FileTool fileTool,
@@ -101,6 +108,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         this.systemPrompt = systemPrompt;
         this.memoryStore = memoryStore;
         this.ragDocumentLoader = ragDocumentLoader;
+        this.hybridRetriever = hybridRetriever;
         this.mcpToolCallbackProvider = mcpToolCallbackProvider;
         this.noteTool = noteTool;
         this.fileTool = fileTool;
@@ -243,7 +251,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             return ChatResponse.builder().conversationId(id).reply(hint).build();
         }
 
-        String context = ragDocumentLoader.retrieveContext(input, 4);
+        String context = retrieveRagContext(input);
         String systemWithContext = systemPrompt.replace("{context}", context != null ? context : "");
         List<Message> msgList = new ArrayList<>();
         msgList.add(new SystemMessage(systemWithContext));
@@ -261,6 +269,23 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         return ChatResponse.builder().conversationId(id).usageTokens(usage).reply(reply != null ? reply : "").build();
     }
 
+    /**
+     * 混合检索：向量 + BM25 → RRF 融合 → qwen3-rerank 精排，拼成上下文文本。
+     * 异常时降级为原纯向量检索（top4），保证主链路不中断。
+     */
+    private String retrieveRagContext(String query) {
+        try {
+            List<Document> docs = hybridRetriever.retrieve(query, 5);
+            return docs.stream()
+                    .map(Document::getText)
+                    .filter(s -> s != null && !s.isBlank())
+                    .collect(Collectors.joining("\n\n"));
+        } catch (Exception e) {
+            log.warn("混合检索失败，退化纯向量检索：{}", e.getMessage());
+            return ragDocumentLoader.retrieveContext(query, 4);
+        }
+    }
+
     @Override
     public ChatStreamSession chatWithRagStream(String conversationId, String userMessage) {
         String id = conversationId != null && !conversationId.isBlank() ? conversationId.trim() : UUID.randomUUID().toString();
@@ -269,7 +294,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         if (hint != null) {
             return new ChatStreamSession(id, Flux.just(hint));
         }
-        String context = ragDocumentLoader.retrieveContext(input, 4);
+        String context = retrieveRagContext(input);
         String systemWithContext = systemPrompt.replace("{context}", context != null ? context : "");
         List<Message> msgList = new ArrayList<>();
         msgList.add(new SystemMessage(systemWithContext));

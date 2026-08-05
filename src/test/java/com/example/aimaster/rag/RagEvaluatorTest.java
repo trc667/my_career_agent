@@ -1,6 +1,8 @@
 package com.example.aimaster.rag;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.lucene.analysis.cjk.CJKAnalyzer;
+import org.apache.lucene.analysis.cn.smart.SmartChineseAnalyzer;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.document.Document;
@@ -9,7 +11,9 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.test.context.ActiveProfiles;
+import org.wltea.analyzer.lucene.IKAnalyzer;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -667,20 +671,25 @@ class RagEvaluatorTest {
     @Test
     void compareHybrid() {
         // 1) 重新向量化最新知识库（TRUNCATE + 全量入库），保证与 BM25 索引同源
-        log.info("重新向量化知识库（228 段），保证与 BM25 索引同源...");
+        log.info("重新向量化知识库，保证与 BM25 索引同源...");
         ragDocumentLoader.loadAndIndex(new ClassPathResource("rag/career-tips.txt"));
 
-        Bm25Retriever bm25 = new Bm25Retriever(new ClassPathResource("rag/career-tips.txt"));
-        int maxK = 5;
+        Resource res = new ClassPathResource("rag/career-tips.txt");
+        // 三分词器对比：CJK(bigram 基线) / SmartChinese(零依赖) / IK(ik_smart 主力)——单一变量仅换 Analyzer
+        List<Bm25Retriever> retrievers = List.of(
+                new Bm25Retriever(res, new CJKAnalyzer()),
+                new Bm25Retriever(res, new SmartChineseAnalyzer()),
+                new Bm25Retriever(res, new IKAnalyzer(true)));
+        String[] names = {"CJK-bigram", "SmartChinese", "IK(ik_smart)"};
 
-        // 预收集：每个 QA 的 baseline(top5)、向量 top10、BM25 top10（检索只做一次，融合参数遍历在内存完成）
+        int maxK = 5;
+        int total = QA_PAIRS.length;
         List<List<Document>> baseList = new ArrayList<>();
         List<List<Document>> vTopList = new ArrayList<>();
-        List<List<Document>> bTopList = new ArrayList<>();
-        // 互补性诊断：仅 BM25 top10 命中 / 仅向量 top5 命中 / 共同命中
-        int bm25Rescues = 0, vectorOnly = 0, bothHit = 0;
-        List<String> rescueQueries = new ArrayList<>();
-        List<String> vectorOnlyQueries = new ArrayList<>();
+        Map<Integer, List<List<Document>>> bTopMap = new LinkedHashMap<>();
+
+        // 预收集：向量检索一次，BM25 三分词器各检索一次（RRF/rerank 参数全程固定）
+        int bm25Rescues = 0;
         for (Object[] pair : QA_PAIRS) {
             String q = (String) pair[0];
             String exp = (String) pair[1];
@@ -688,95 +697,86 @@ class RagEvaluatorTest {
                     SearchRequest.builder().query(q).topK(maxK).build());
             List<Document> vTop = vectorStore.similaritySearch(
                     SearchRequest.builder().query(q).topK(RRF_TOP_N).build());
-            List<Document> bTop = bm25.search(q, RRF_TOP_N);
             baseList.add(base);
             vTopList.add(vTop);
-            bTopList.add(bTop);
-            boolean baseHit = matchesAny(base, exp);
-            boolean bmHit = matchesAny(bTop, exp);
-            if (!baseHit && bmHit) { bm25Rescues++; rescueQueries.add(q + " → " + exp); }
-            else if (baseHit && !bmHit) { vectorOnly++; vectorOnlyQueries.add(q + " → " + exp); }
-            else if (baseHit) bothHit++;
+            for (int ri = 0; ri < retrievers.size(); ri++) {
+                List<Document> bTop = retrievers.get(ri).search(q, RRF_TOP_N);
+                bTopMap.computeIfAbsent(ri, k -> new ArrayList<>()).add(bTop);
+                if (ri == 0 && !matchesAny(base, exp) && matchesAny(bTop, exp)) bm25Rescues++;
+            }
         }
 
-        // 融合参数组：{k, 向量权重 w1, BM25 权重 w2}
-        double[][] params = {
-                {60, 1.0, 1.0}, // 标准 RRF（等权）
-                {30, 1.0, 1.0}, // 更激进：强调两路靠前排名
-                {60, 1.0, 0.5}, // 向量为主
-                {60, 1.0, 0.3}, // 向量更强
-        };
-        String[] names = {"k60 w1:1 w2:1", "k30 w1:1 w2:1", "k60 w1:1 w2:.5", "k60 w1:1 w2:.3"};
+        System.out.println("========== 中文分词器对比（629 段 / " + total + " QA，仅换 Analyzer） ==========");
 
-        int total = QA_PAIRS.length;
-        System.out.println("========== 向量+BM25 混合检索：融合参数调优（228 段知识库） ==========");
-        System.out.printf("互补性：%d/%d 个 query 仅 BM25 在 top10 命中（向量 top5 漏检）%n", bm25Rescues, total);
-        System.out.println("== 互补性诊断（top5 向量 vs top10 BM25）==");
-        System.out.printf("  共同命中 %d | 仅向量命中 %d | 仅 BM25 命中 %d | 两路都未命中 %d%n",
-                bothHit, vectorOnly, bm25Rescues, total - bothHit - vectorOnly - bm25Rescues);
-        System.out.println("  仅 BM25 命中（BM25 独有价值的证据）:");
-        for (String s : rescueQueries) System.out.println("    " + s);
-        System.out.println("  仅向量命中（BM25 漏检）:");
-        for (String s : vectorOnlyQueries) System.out.println("    " + s);
+        // A. 三组分词器 BM25-only
+        System.out.println("--- A. BM25-only ---");
+        System.out.printf("%-14s %-11s %-11s %-11s %-9s%n", "分词器", "R@1", "R@3", "R@5", "MRR");
+        for (int ri = 0; ri < retrievers.size(); ri++) {
+            int[] hits = {0, 0, 0};
+            double mrr = 0;
+            for (int i = 0; i < total; i++) {
+                String exp = (String) QA_PAIRS[i][1];
+                List<Document> docs = bTopMap.get(ri).get(i);
+                List<Document> top5 = docs.subList(0, Math.min(maxK, docs.size()));
+                stats(hits, top5, exp);
+                mrr += mrrc(top5, exp);
+            }
+            System.out.printf("%-14s %-11s %-11s %-11s %-9.4f%n", names[ri],
+                    pct(hits[0], total), pct(hits[1], total), pct(hits[2], total), mrr / total);
+        }
 
-        // Baseline（纯向量）
+        // B. 三组分词器 Hybrid（向量 + BM25，RRF k60 等权）
+        System.out.println("--- B. Hybrid（向量 + BM25，RRF k60 等权） ---");
+        System.out.printf("%-14s %-11s %-11s %-11s %-9s%n", "分词器", "R@1", "R@3", "R@5", "MRR");
+        for (int ri = 0; ri < retrievers.size(); ri++) {
+            int[] hits = {0, 0, 0};
+            double mrr = 0;
+            for (int i = 0; i < total; i++) {
+                String exp = (String) QA_PAIRS[i][1];
+                List<Document> fused = rrfFuseWeighted(vTopList.get(i), bTopMap.get(ri).get(i), 60, 1.0, 1.0, maxK);
+                stats(hits, fused, exp);
+                mrr += mrrc(fused, exp);
+            }
+            System.out.printf("%-14s %-11s %-11s %-11s %-9.4f%n", names[ri],
+                    pct(hits[0], total), pct(hits[1], total), pct(hits[2], total), mrr / total);
+        }
+
+        // C. 参考：纯向量基线 + 互补性
         int[] bHits = {0, 0, 0};
         double bMRR = 0;
-        for (int i = 0; i < QA_PAIRS.length; i++) {
+        for (int i = 0; i < total; i++) {
             String exp = (String) QA_PAIRS[i][1];
             stats(bHits, baseList.get(i), exp);
             bMRR += mrrc(baseList.get(i), exp);
         }
-        System.out.println("Baseline（纯向量）:");
-        System.out.printf("  Recall@1: %.1f%%   Recall@3: %.1f%%   Recall@5: %.1f%%   MRR: %.4f%n",
-                100.0 * bHits[0] / total, 100.0 * bHits[1] / total, 100.0 * bHits[2] / total, bMRR / total);
+        System.out.println("--- C. 参考 ---");
+        System.out.printf("纯向量 Baseline: R@1 %s  R@3 %s  R@5 %s  MRR %.4f%n",
+                pct(bHits[0], total), pct(bHits[1], total), pct(bHits[2], total), bMRR / total);
+        System.out.printf("互补性（CJK bigram）: %d/%d 仅 BM25 命中向量漏检%n", bm25Rescues, total);
 
-        // 各组融合参数
-        for (int gi = 0; gi < params.length; gi++) {
-            int k = (int) params[gi][0];
-            double w1 = params[gi][1], w2 = params[gi][2];
+        // D. 子样本 Hybrid + Rerank（三个分词器各跑，qwen3-rerank 固定）
+        int sampleCount = Math.min(60, total);
+        System.out.println("--- D. 子样本 Hybrid + Rerank（前 " + sampleCount + " QA，qwen3-rerank） ---");
+        System.out.printf("%-14s %-11s %-11s %-11s %-9s%n", "分词器", "R@1", "R@3", "R@5", "MRR");
+        for (int ri = 0; ri < retrievers.size(); ri++) {
             int[] hits = {0, 0, 0};
-            double mrrSum = 0;
-            for (int i = 0; i < QA_PAIRS.length; i++) {
+            double mrr = 0;
+            for (int i = 0; i < sampleCount; i++) {
+                String q = (String) QA_PAIRS[i][0];
                 String exp = (String) QA_PAIRS[i][1];
-                List<Document> fused = rrfFuseWeighted(vTopList.get(i), bTopList.get(i), k, w1, w2, maxK);
-                stats(hits, fused, exp);
-                mrrSum += mrrc(fused, exp);
+                List<Document> fused = rrfFuseWeighted(vTopList.get(i), bTopMap.get(ri).get(i), 60, 1.0, 1.0, RRF_TOP_N);
+                List<Document> reranked = reranker.rerank(q, fused, maxK);
+                stats(hits, reranked, exp);
+                mrr += mrrc(reranked, exp);
             }
-            System.out.printf("Hybrid %s:", names[gi]);
-            System.out.printf("  Recall@1: %.1f%%   Recall@3: %.1f%%   Recall@5: %.1f%%   MRR: %.4f%n",
-                    100.0 * hits[0] / total, 100.0 * hits[1] / total, 100.0 * hits[2] / total, mrrSum / total);
+            System.out.printf("%-14s %-11s %-11s %-11s %-9.4f%n", names[ri],
+                    pct(hits[0], sampleCount), pct(hits[1], sampleCount), pct(hits[2], sampleCount), mrr / sampleCount);
         }
+    }
 
-        // 路 4：Hybrid + Rerank 精排（子样本前 SAMPLE 个 QA 调 qwen3-rerank，节省 API 调用时间）
-        int sampleN = 60;
-        int[] sBase = {0, 0, 0}, sHyb = {0, 0, 0}, sRank = {0, 0, 0};
-        double sBM = 0, sHM = 0, sRM = 0;
-        int sampleCount = Math.min(sampleN, QA_PAIRS.length);
-        for (int i = 0; i < sampleCount; i++) {
-            String q = (String) QA_PAIRS[i][0];
-            String exp = (String) QA_PAIRS[i][1];
-            // baseline（同口径）
-            stats(sBase, baseList.get(i), exp); sBM += mrrc(baseList.get(i), exp);
-            // hybrid（等权 RRF top5）
-            List<Document> fused5 = rrfFuseWeighted(vTopList.get(i), bTopList.get(i), 60, 1.0, 1.0, maxK);
-            stats(sHyb, fused5, exp); sHM += mrrc(fused5, exp);
-            // hybrid + rerank（RRF 融合 top10 → qwen3-rerank → top5）
-            List<Document> fused10 = rrfFuseWeighted(vTopList.get(i), bTopList.get(i), 60, 1.0, 1.0, RRF_TOP_N);
-            List<Document> reranked = reranker.rerank(q, fused10, maxK);
-            stats(sRank, reranked, exp); sRM += mrrc(reranked, exp);
-        }
-        System.out.println("========== 子样本三路对比（前 " + sampleCount + " QA，qwen3-rerank 精排） ==========");
-        System.out.printf("%-18s %-18s %-18s %-18s%n", "指标", "Baseline", "Hybrid(等权)", "Hybrid+Rerank");
-        System.out.printf("%-18s %-18s %-18s %-18s%n", "-----", "--------", "-----------", "-------------");
-        System.out.printf("%-18s %-18.1f%% %-18.1f%% %-18.1f%%%n", "Recall@1",
-                100.0 * sBase[0] / sampleCount, 100.0 * sHyb[0] / sampleCount, 100.0 * sRank[0] / sampleCount);
-        System.out.printf("%-18s %-18.1f%% %-18.1f%% %-18.1f%%%n", "Recall@3",
-                100.0 * sBase[1] / sampleCount, 100.0 * sHyb[1] / sampleCount, 100.0 * sRank[1] / sampleCount);
-        System.out.printf("%-18s %-18.1f%% %-18.1f%% %-18.1f%%%n", "Recall@5",
-                100.0 * sBase[2] / sampleCount, 100.0 * sHyb[2] / sampleCount, 100.0 * sRank[2] / sampleCount);
-        System.out.printf("%-18s %-18.4f %-18.4f %-18.4f%n", "MRR",
-                sBM / sampleCount, sHM / sampleCount, sRM / sampleCount);
+    /** 格式化百分比 */
+    private static String pct(int n, int t) {
+        return String.format("%.1f%%", 100.0 * n / t);
     }
 
     /**

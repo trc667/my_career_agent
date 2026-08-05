@@ -2,7 +2,6 @@ package com.example.aimaster.rag;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.cjk.CJKAnalyzer;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
@@ -17,6 +16,7 @@ import org.apache.lucene.search.similarities.BM25Similarity;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
 import org.springframework.core.io.Resource;
+import org.wltea.analyzer.lucene.IKAnalyzer;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -47,9 +47,21 @@ public class Bm25Retriever {
     private final Analyzer analyzer;
     private final int docCount;
 
+    /**
+     * 默认分词器：IK(ik_smart) 词语分词（经 327 QA 实测：Hybrid R@5 89.6%→91.7%、MRR 0.747→0.754）。
+     * 历史对比：CJK bigram 61.5% R@1 / 82.0% R@5 → IK 65.7% / 84.7%。
+     */
     public Bm25Retriever(Resource resource) {
+        this(resource, new IKAnalyzer(true));
+    }
+
+    /**
+     * 可注入自定义中文分词器（CJK bigram / SmartChinese / IK 等），用于分词对比实验。
+     * 索引与检索共用同一 Analyzer，保证语义一致。
+     */
+    public Bm25Retriever(Resource resource, Analyzer analyzer) {
+        this.analyzer = analyzer;
         try {
-            analyzer = new CJKAnalyzer();
             Directory dir = new ByteBuffersDirectory();
             IndexWriterConfig config = new IndexWriterConfig(analyzer);
             config.setSimilarity(new BM25Similarity());

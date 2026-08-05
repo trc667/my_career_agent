@@ -110,7 +110,7 @@ public class RagDocumentLoader {
     }
 
     /** 基于关键词自动分类（面试可讲：减少无关文档干扰，缩小候选池） */
-    static String autoTag(String text) {
+    public static String autoTag(String text) {
         if (text.contains("后端") || text.contains("Java") || text.contains("Spring") || text.contains("MySQL") || text.contains("Redis")) return "后端";
         if (text.contains("前端") || text.contains("Vue") || text.contains("React") || text.contains("CSS")) return "前端";
         if (text.contains("算法") || text.contains("LeetCode") || text.contains("动态规划")) return "算法";
