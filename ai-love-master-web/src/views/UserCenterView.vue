@@ -6,10 +6,18 @@
 
     <div class="uc-card">
       <div class="uc-head">
-        <el-avatar :size="56" class="uc-head__avatar">{{ (info.username || '我')[0] }}</el-avatar>
+        <el-avatar :size="56" class="uc-head__avatar" :src="info.avatar || undefined">{{ info.avatar ? '' : (info.username || '我')[0] }}</el-avatar>
         <div class="uc-head__text">
           <h1 class="uc-title">{{ info.username || '用户' }}</h1>
           <p class="uc-sub">注册时间：{{ info.createTime || '—' }}</p>
+          <el-upload
+            class="uc-head__upload"
+            :show-file-list="false"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            :http-request="handleUploadAvatar"
+          >
+            <el-button size="small" link type="primary">更换头像</el-button>
+          </el-upload>
         </div>
       </div>
 
@@ -81,13 +89,13 @@ import { onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import { changePassword, getUserMe, type UserInfo } from '../api/user';
+import { changePassword, getUserMe, uploadAvatar, type UserInfo } from '../api/user';
 import { useAuthStore } from '../store/authStore';
 
 const router = useRouter();
 const authStore = useAuthStore();
 
-const info = reactive<UserInfo>({ id: 0, username: '', createTime: '' });
+const info = reactive<UserInfo>({ id: 0, username: '', createTime: '', avatar: '' });
 const formRef = ref<FormInstance>();
 const saving = ref(false);
 
@@ -123,10 +131,23 @@ onMounted(async () => {
     info.id = res.data?.id ?? 0;
     info.username = res.data?.username ?? '';
     info.createTime = res.data?.createTime ? String(res.data.createTime).slice(0, 19).replace('T', ' ') : '';
+    info.avatar = res.data?.avatar ?? '';
   } catch {
     // 401 由 http 拦截器统一处理
   }
 });
+
+/** 上传/更换头像（el-upload 自定义请求） */
+async function handleUploadAvatar(options: { file: File }) {
+  try {
+    const res = await uploadAvatar(options.file);
+    info.avatar = res.data?.avatar ?? '';
+    authStore.setAvatar(res.data?.avatar ?? '');
+    ElMessage.success('头像已更新');
+  } catch {
+    // 错误提示由 http 拦截器处理
+  }
+}
 
 async function handleChangePassword() {
   if (!formRef.value) return;

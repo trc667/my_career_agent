@@ -26,7 +26,7 @@
           <div class="chat-header__title">AI 超级智能体</div>
         </div>
         <div class="chat-header__right">
-          <el-avatar size="small">{{ (authStore.username || '我')[0] }}</el-avatar>
+          <el-avatar :size="32" :src="authStore.avatar || undefined">{{ authStore.avatar ? '' : (authStore.username || '我')[0] }}</el-avatar>
           <span class="chat-header__nickname">{{ authStore.username || '用户' }}</span>
           <el-button link size="small" @click="handleLogout">退出</el-button>
         </div>
@@ -103,6 +103,7 @@ function updateResponsive() {
 onMounted(() => {
   updateResponsive();
   store.ensureCurrentConversation();
+  authStore.fetchAvatar();
   window.addEventListener('resize', updateResponsive);
 });
 

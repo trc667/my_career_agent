@@ -40,6 +40,10 @@ public class User {
     @TableField("role")
     private String role;
 
+    /** 头像 URL（阿里云 OSS 地址，可空） */
+    @TableField("avatar")
+    private String avatar;
+
     @TableField("created_at")
     private LocalDateTime createTime;
 

@@ -1,16 +1,19 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { login as apiLogin, register as apiRegister } from '../api/auth';
+import { getUserMe } from '../api/user';
 import type { LoginRequest, RegisterRequest } from '../api/auth';
 
 const TOKEN_KEY = 'love_master_token';
 const USERNAME_KEY = 'love_master_username';
 const ROLE_KEY = 'love_master_role';
+const AVATAR_KEY = 'love_master_avatar';
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem(TOKEN_KEY));
   const username = ref<string | null>(localStorage.getItem(USERNAME_KEY));
   const role = ref<string | null>(localStorage.getItem(ROLE_KEY));
+  const avatar = ref<string | null>(localStorage.getItem(AVATAR_KEY));
 
   const isAuthenticated = () => !!token.value;
   const isAdmin = () => role.value === 'ADMIN';
@@ -24,13 +27,33 @@ export const useAuthStore = defineStore('auth', () => {
     if (r) localStorage.setItem(ROLE_KEY, r);
   }
 
+  /** 拉取当前用户头像（登录后/上传头像后调用，失败静默保持兜底） */
+  async function fetchAvatar() {
+    if (!token.value) return;
+    try {
+      const res = await getUserMe();
+      avatar.value = res.data?.avatar ?? null;
+      if (avatar.value) localStorage.setItem(AVATAR_KEY, avatar.value);
+    } catch {
+      // 静默：401 由 http 拦截器处理
+    }
+  }
+
+  /** 上传头像成功后同步（供 UserCenterView 调用） */
+  function setAvatar(url: string) {
+    avatar.value = url;
+    localStorage.setItem(AVATAR_KEY, url);
+  }
+
   function clearAuth() {
     token.value = null;
     username.value = null;
     role.value = null;
+    avatar.value = null;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USERNAME_KEY);
     localStorage.removeItem(ROLE_KEY);
+    localStorage.removeItem(AVATAR_KEY);
   }
 
   async function login(data: LoginRequest) {
@@ -73,10 +96,13 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     username,
     role,
+    avatar,
     isAuthenticated,
     isAdmin,
     login,
     register,
     logout,
+    fetchAvatar,
+    setAvatar,
   };
 });

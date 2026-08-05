@@ -56,3 +56,10 @@ export function deleteFeedback(id: number) {
 export function getAdminUsers() {
   return http.get<any, ResultWrapper<AdminUser[]>>('/api/admin/users');
 }
+
+/* AI 头像（全局，所有人可见） */
+export function uploadAiAvatar(file: File) {
+  const fd = new FormData();
+  fd.append('file', file);
+  return http.post<any, ResultWrapper<{ avatar: string }>>('/api/admin/ai-avatar', fd);
+}

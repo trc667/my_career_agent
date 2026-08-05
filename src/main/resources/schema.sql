@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS app_user (
     password_hash VARCHAR(128) NOT NULL,
     email VARCHAR(128) DEFAULT NULL,
     role VARCHAR(16) DEFAULT 'USER',
+    avatar VARCHAR(512) DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_user_email (email)
@@ -31,6 +32,16 @@ SET @ddl2 := IF(@has_role = 0,
 PREPARE stmt2 FROM @ddl2;
 EXECUTE stmt2;
 DEALLOCATE PREPARE stmt2;
+
+-- 兼容已存在的 app_user 表：若缺少 avatar 列则补充（头像 URL）
+SET @has_avatar := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'app_user' AND COLUMN_NAME = 'avatar');
+SET @ddl3 := IF(@has_avatar = 0,
+    'ALTER TABLE app_user ADD COLUMN avatar VARCHAR(512) DEFAULT NULL',
+    'SELECT 1');
+PREPARE stmt3 FROM @ddl3;
+EXECUTE stmt3;
+DEALLOCATE PREPARE stmt3;
 
 -- 意见反馈表
 CREATE TABLE IF NOT EXISTS feedback (

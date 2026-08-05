@@ -1,12 +1,15 @@
 package com.example.aimaster.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.aimaster.dto.ChangePasswordRequest;
 import com.example.aimaster.dto.FeedbackRequest;
 import com.example.aimaster.dto.Result;
 import com.example.aimaster.entity.Feedback;
 import com.example.aimaster.entity.User;
 import com.example.aimaster.mapper.FeedbackMapper;
+import com.example.aimaster.mapper.UserMapper;
 import com.example.aimaster.service.AuthService;
+import com.example.aimaster.service.OssStorageService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -14,7 +17,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -29,10 +34,17 @@ public class UserController {
 
     private final AuthService authService;
     private final FeedbackMapper feedbackMapper;
+    private final OssStorageService ossStorageService;
+    private final UserMapper userMapper;
 
-    public UserController(AuthService authService, FeedbackMapper feedbackMapper) {
+    public UserController(AuthService authService,
+                          FeedbackMapper feedbackMapper,
+                          OssStorageService ossStorageService,
+                          UserMapper userMapper) {
         this.authService = authService;
         this.feedbackMapper = feedbackMapper;
+        this.ossStorageService = ossStorageService;
+        this.userMapper = userMapper;
     }
 
     /** 获取当前登录用户名（从 SecurityContext 取，JWT 过滤器已注入） */
@@ -49,7 +61,21 @@ public class UserController {
         info.put("id", user.getId());
         info.put("username", user.getUsername());
         info.put("createTime", user.getCreateTime());
+        info.put("avatar", user.getAvatar());
         return Result.ok(info);
+    }
+
+    /** POST /api/user/avatar 上传/更换个人头像（multipart/form-data 字段名 file） */
+    @PostMapping("/avatar")
+    public Result<Map<String, Object>> uploadAvatar(@RequestParam("file") MultipartFile file) {
+        String url = ossStorageService.uploadUserAvatar(file);
+        User user = authService.getUserInfo(currentUsername());
+        user.setAvatar(url);
+        userMapper.update(user,
+                new LambdaQueryWrapper<User>().eq(User::getUsername, currentUsername()));
+        Map<String, Object> data = new HashMap<>();
+        data.put("avatar", url);
+        return Result.ok(data);
     }
 
     /** POST /api/user/change-password 修改密码 */

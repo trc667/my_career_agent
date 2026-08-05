@@ -60,6 +60,23 @@
             </el-table-column>
           </el-table>
         </el-tab-pane>
+
+        <!-- AI 设置 -->
+        <el-tab-pane label="AI 设置" name="ai">
+          <div class="admin-ai">
+            <div class="admin-ai__preview">
+              <el-avatar :size="72" :src="aiAvatar || undefined">{{ aiAvatar ? '' : 'AI' }}</el-avatar>
+              <p class="admin-ai__tip">该头像将展示给所有用户（AI 助手头像），上传后全局生效</p>
+            </div>
+            <el-upload
+              :show-file-list="false"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              :http-request="handleUploadAiAvatar"
+            >
+              <el-button type="primary">上传 / 更换 AI 头像</el-button>
+            </el-upload>
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </main>
 
@@ -100,9 +117,11 @@ import {
   getAdminFeedbacks,
   getAdminUsers,
   updateAnnouncement,
+  uploadAiAvatar,
   type AdminFeedback,
   type AdminUser,
 } from '../api/admin';
+import { getAiAvatar } from '../api/user';
 import type { Notice } from '../api/notice';
 
 const activeTab = ref('announcements');
@@ -113,6 +132,7 @@ const users = ref<AdminUser[]>([]);
 const annDialogVisible = ref(false);
 const editingAnn = ref<Notice | null>(null);
 const annForm = reactive({ title: '', content: '' });
+const aiAvatar = ref('');
 
 function formatTime(t?: string) {
   if (!t) return '';
@@ -125,8 +145,21 @@ async function loadAll() {
     announcements.value = a.data ?? [];
     feedbacks.value = f.data ?? [];
     users.value = u.data ?? [];
+    const ai = await getAiAvatar();
+    aiAvatar.value = ai.data?.avatar ?? '';
   } catch {
     // 403/401 由拦截器处理
+  }
+}
+
+/** 上传/更换 AI 头像（覆盖固定 key，全局生效） */
+async function handleUploadAiAvatar(options: { file: File }) {
+  try {
+    const res = await uploadAiAvatar(options.file);
+    aiAvatar.value = res.data?.avatar ?? '';
+    ElMessage.success('AI 头像已更新，所有用户可见');
+  } catch {
+    // 错误提示由 http 拦截器处理
   }
 }
 

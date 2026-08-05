@@ -10,6 +10,7 @@ import com.example.aimaster.exception.BusinessException;
 import com.example.aimaster.mapper.AnnouncementMapper;
 import com.example.aimaster.mapper.FeedbackMapper;
 import com.example.aimaster.mapper.UserMapper;
+import com.example.aimaster.service.OssStorageService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,7 +19,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -36,13 +39,16 @@ public class AdminController {
     private final AnnouncementMapper announcementMapper;
     private final FeedbackMapper feedbackMapper;
     private final UserMapper userMapper;
+    private final OssStorageService ossStorageService;
 
     public AdminController(AnnouncementMapper announcementMapper,
                            FeedbackMapper feedbackMapper,
-                           UserMapper userMapper) {
+                           UserMapper userMapper,
+                           OssStorageService ossStorageService) {
         this.announcementMapper = announcementMapper;
         this.feedbackMapper = feedbackMapper;
         this.userMapper = userMapper;
+        this.ossStorageService = ossStorageService;
     }
 
     /* ===== 公告管理 ===== */
@@ -115,5 +121,16 @@ public class AdminController {
             return m;
         }).toList();
         return Result.ok(result);
+    }
+
+    /* ===== AI 头像（全局，所有人可见） ===== */
+
+    /** POST /api/admin/ai-avatar 上传/更换 AI 头像（覆盖固定 key，全体用户可见） */
+    @PostMapping("/ai-avatar")
+    public Result<Map<String, Object>> uploadAiAvatar(@RequestParam("file") MultipartFile file) {
+        String url = ossStorageService.uploadAiAvatar(file);
+        Map<String, Object> data = new HashMap<>();
+        data.put("avatar", url);
+        return Result.ok(data);
     }
 }

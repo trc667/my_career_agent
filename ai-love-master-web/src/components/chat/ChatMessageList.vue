@@ -7,8 +7,14 @@
       :class="`chat-list__item--${m.role}`"
     >
       <div class="chat-list__avatar">
-        <el-avatar v-if="m.role === 'user'" size="small">我</el-avatar>
-        <el-avatar v-else size="small">AI</el-avatar>
+        <el-avatar v-if="m.role === 'user'" :size="36">
+          <img v-if="userAvatar" :src="userAvatar" class="chat-list__avatar-img" @error="() => (userAvatar = '')" />
+          <template v-else>我</template>
+        </el-avatar>
+        <el-avatar v-else :size="36">
+          <img v-if="aiAvatar" :src="aiAvatar" class="chat-list__avatar-img" @error="() => (aiAvatar = '')" />
+          <template v-else>AI</template>
+        </el-avatar>
       </div>
       <div class="chat-list__bubble">
         <ThinkingSteps v-if="m.role === 'assistant' && m.steps?.length" :steps="m.steps" />
@@ -37,10 +43,11 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue';
+import { nextTick, onMounted, ref, watch } from 'vue';
 import type { ChatMessage } from '../../store/chatStore';
 import ThinkingSteps from './ThinkingSteps.vue';
 import { renderMarkdown } from '../../utils/markdown';
+import { getAiAvatar, getUserMe } from '../../api/user';
 
 const props = defineProps<{
   messages: ChatMessage[];
@@ -49,6 +56,14 @@ const props = defineProps<{
 }>();
 
 const scrollAnchor = ref<HTMLElement | null>(null);
+const aiAvatar = ref('');
+const userAvatar = ref('');
+
+onMounted(async () => {
+  // 并行拉取 AI 头像（全局公开）与当前用户头像，失败则保持首字母兜底
+  getAiAvatar().then((r) => { aiAvatar.value = r.data?.avatar ?? ''; }).catch(() => {});
+  getUserMe().then((r) => { userAvatar.value = r.data?.avatar ?? ''; }).catch(() => {});
+});
 
 watch(
   () => [props.messages, props.typing, props.streamingContent],
@@ -74,6 +89,15 @@ watch(
 
 .chat-list__item--user {
   flex-direction: row-reverse;
+}
+
+/* 头像图片：占满圆形容器、等比例裁剪 */
+.chat-list__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
 }
 
 .chat-list__bubble {
