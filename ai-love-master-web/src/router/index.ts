@@ -14,6 +14,7 @@ const router = createRouter({
     { path: '/navigate', name: 'navigate', component: () => import('../views/NavigateView.vue'), meta: { title: '网站导航' } },
     { path: '/notice', name: 'notice', component: () => import('../views/NoticeView.vue'), meta: { title: '公告中心' } },
     { path: '/admin', name: 'admin', component: () => import('../views/AdminView.vue'), meta: { title: '管理后台', requiresAuth: true, requiresAdmin: true } },
+    { path: '/bagu', name: 'bagu', component: () => import('../views/BaguView.vue'), meta: { title: 'AI 八股练习场', requiresAuth: true } },
   ],
 });
 

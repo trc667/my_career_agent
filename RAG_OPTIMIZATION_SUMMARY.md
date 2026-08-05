@@ -25,7 +25,7 @@
 |---|---|
 | `rag/RagDocumentLoader.java` | ① 入库前 `TRUNCATE`（防重复堆积）② 分批写入 `batch=8`（DashScope API 单次上限 **10 条**）③ 长段按句号二级切分（`splitLongParagraph`，300 字阈值，`(?<=[。；！？])` 零宽后行断言）④ 自动打标签 `autoTag`（关键词映射 → metadata JSON 存 `category`） |
 | `rag/QueryRewriter.java`（新增） | ① 规则版 Query 改写（SPOKEN_PATTERN 去口语词 + DOMAIN_MAP 领域词映射）② HyDE 策略（`hydeRewrite`：LLM 生成假设答案 → 用答案做检索） |
-| `rag/Bm25Retriever.java`（新增） | Lucene 内存索引（CJKAnalyzer 中文 bigram 分词 + BM25Similarity）稀疏检索，与 pgvector 稠密检索做加权 RRF 融合 |
+| `rag/Bm25Retriever.java`（新增） | Lucene 内存索引（**IK-analyzer ik_smart 词语分词** + BM25Similarity）稀疏检索，与 pgvector 稠密检索做加权 RRF 融合 |
 | `rag/KnowledgeBatchGenerator.java`（新增） | LLM 批量生成知识段：主题清单 → qwen-plus → JSON 解析 → 落盘（`raggen` profile 触发） |
 | `pom.xml` | 加 `lucene-core` / `lucene-analysis-common` / `lucene-queryparser` 9.11.1 |
 
@@ -90,6 +90,7 @@
 | 评估集扩容对优化的影响 | 术语类 QA 加入后 BM25 增益 1.6%→**4.0%**，最优参数从降权变等权 | 评估集构成决定策略价值：131 对偏语义测不出 BM25，+70 条术语类后互补 case 7→19，证明"先扩评估集再评策略" |
 | 数据量增大对混合检索的影响（629 段验证） | 增益 0.8%→4.0%→**6.1%**，互补 case 7→19→**39**；Baseline 随规模回归真实（R@5 88.5→83.5） | 候选池增大→向量漏检率上升→BM25 救回价值放大；**629 段下 Hybrid 全指标反超**（R@1 +3.9%、MRR +0.053） |
 | Rerank 精排（qwen3-rerank） | Recall@1 **+13.5%**（64.5→78.0），MRR +0.104，R@5 89.6→93.9 | 交叉编码器捕捉 query-doc 细粒度交互，排序质量质变；精排是"召回"到"排得准"的分水岭（R@1 提升远大于 R@5） |
+| 中文分词器对比（327 QA） | BM25-only R@1 61.5%→67.3%（CJK→SmartCN）、R@5 82.0%→84.7%（→IK） | CJK bigram 切碎专有名词/术语；词语分词全面胜出，**IK(ik_smart) Hybrid R@5 89.6%→91.7%（+2.1%）**，定为最终分词器 |
 
 ### 3.3 踩过的坑
 
@@ -123,7 +124,7 @@
 |---|---|
 | 向量库 | PostgreSQL 18 + pgvector 0.8.6（HNSW 索引，`vector_cosine_ops`） |
 | Embedding | DashScope text-embedding-v4（1024 维） |
-| 稀疏检索 | Lucene 9.11（CJKAnalyzer 中文 bigram 分词 + BM25Similarity） |
+| 稀疏检索 | Lucene 9.11（**IK-analyzer ik_smart 词语分词** + BM25Similarity） |
 | Rerank | DashScope qwen3-rerank（交叉编码器，text-rerank API） |
 | LLM | DashScope qwen-plus |
 | 框架 | Spring Boot 3.4.5 + Spring AI 1.0.1 |
@@ -140,4 +141,5 @@
 - [ ] FAQ 精确匹配拦截层
 - [x] 向量 + BM25 混合检索（知识库 200+ 段后启用）——228 段已实现，Recall@5 +1.6%
 - [x] Rerank 精排（qwen3-rerank）——629 段验证 Recall@1 +13.5%
+- [x] BM25 中文分词升级（CJK bigram → IK ik_smart）——Hybrid R@5 89.6%→91.7%
 - [ ] 多粒度三层切片 + 三路 RRF（知识库 500+ 段后启用）

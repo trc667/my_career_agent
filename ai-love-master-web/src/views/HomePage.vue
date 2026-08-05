@@ -11,7 +11,7 @@
         <template v-if="authStore.isAuthenticated()">
           <el-dropdown trigger="click" @command="handleUserCommand">
             <span class="home__user-trigger">
-              <el-avatar :size="26" class="home__user-avatar">{{ (authStore.username || '我')[0] }}</el-avatar>
+              <el-avatar :size="26" class="home__user-avatar" :src="authStore.avatar || undefined">{{ authStore.avatar ? '' : (authStore.username || '我')[0] }}</el-avatar>
               <span class="home__user-name">{{ authStore.username }}</span>
               <el-icon class="home__user-caret"><ArrowDown /></el-icon>
             </span>
@@ -86,18 +86,18 @@
           <div class="app-card__face app-card__face--front">
             <div class="app-card__icon">🎓</div>
             <h3 class="app-card__name">AI 职规大师</h3>
-            <p class="app-card__desc">职业规划与学习顾问<br />RAG 流式对话</p>
-            <span class="app-card__hint">悬停查看详情 →</span>
+            <p class="app-card__desc">不懂怎么规划职业？<br />简历、面试、校招随时问</p>
+            <span class="app-card__hint">悬停看看能帮你做什么 →</span>
           </div>
           <div class="app-card__face app-card__face--back">
             <h3 class="app-card__back-title">AI 职规大师</h3>
             <ul class="app-card__features">
-              <li>职业方向与技术路线规划</li>
-              <li>校招 / 实习备战攻略</li>
-              <li>简历撰写与面试辅导</li>
-              <li>学习计划与时间管理</li>
+              <li>帮你定方向，不再迷茫</li>
+              <li>教你写简历、过面试</li>
+              <li>规划学习路线和时间</li>
+              <li>校招实习一手攻略</li>
             </ul>
-            <span class="app-card__go">立即体验 →</span>
+            <span class="app-card__go">去聊聊 →</span>
           </div>
         </div>
       </div>
@@ -112,18 +112,44 @@
           <div class="app-card__face app-card__face--front">
             <div class="app-card__icon">🤖</div>
             <h3 class="app-card__name">AI 超级智能体</h3>
-            <p class="app-card__desc">ReAct 多步规划<br />实时展示思考与工具调用</p>
-            <span class="app-card__hint">悬停查看详情 →</span>
+            <p class="app-card__desc">一个任务，AI 帮你跑完<br />查资料、找地点、出 PDF 一条龙</p>
+            <span class="app-card__hint">悬停看看能帮你做什么 →</span>
           </div>
           <div class="app-card__face app-card__face--back">
             <h3 class="app-card__back-title">AI 超级智能体</h3>
             <ul class="app-card__features">
-              <li>多步推理与任务拆解</li>
-              <li>高德地图 / 联网搜索</li>
-              <li>PDF 生成 / 文件保存</li>
-              <li>过程透明，实时可见</li>
+              <li>帮我查附近图书馆</li>
+              <li>上网搜最新资料</li>
+              <li>生成学习计划 PDF</li>
+              <li>保存笔记和文件</li>
             </ul>
-            <span class="app-card__go">立即体验 →</span>
+            <span class="app-card__go">去试试 →</span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="app-card"
+        @click="goToApp('/bagu')"
+        @mousemove="onCardMove($event, $event.currentTarget as HTMLElement)"
+        @mouseleave="onCardLeave($event.currentTarget as HTMLElement)"
+      >
+        <div class="app-card__inner">
+          <div class="app-card__face app-card__face--front">
+            <div class="app-card__icon">📚</div>
+            <h3 class="app-card__name">AI 八股练习场</h3>
+            <p class="app-card__desc">面试八股随便刷<br />按主题速览 + 随机抽题</p>
+            <span class="app-card__hint">悬停看看能帮你做什么 →</span>
+          </div>
+          <div class="app-card__face app-card__face--back">
+            <h3 class="app-card__back-title">AI 八股练习场</h3>
+            <ul class="app-card__features">
+              <li>按主题刷八股，不怕问</li>
+              <li>不会的搜一下就有</li>
+              <li>碎片时间随机来一题</li>
+              <li>不懂让 AI 讲给你听</li>
+            </ul>
+            <span class="app-card__go">去刷题 →</span>
           </div>
         </div>
       </div>
@@ -391,6 +417,7 @@ onMounted(() => {
   typeLoop();
   checkNotice();
   startClock();
+  if (authStore.isAuthenticated()) authStore.fetchAvatar();
 });
 onBeforeUnmount(() => {
   if (timer) clearTimeout(timer);
