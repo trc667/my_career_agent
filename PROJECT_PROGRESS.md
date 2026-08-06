@@ -22,6 +22,7 @@
 | LLM/Embedding | DashScope qwen-plus / text-embedding-v4(1024维) / qwen3-rerank |
 | 向量库 | PostgreSQL 18 + pgvector 0.8.6（HNSW，双数据源：MySQL 业务 + PG 向量） |
 | 稀疏检索 | Lucene 9.11（IK-analyzer ik_smart 中文分词）+ BM25Similarity |
+| 本地缓存 | Caffeine（SemanticCache 语义问答 / ContextCompressor 会话摘要，容量+过期原生管理） |
 | 前端 | Vue3 + TS + Vite + Element Plus（`ai-love-master-web`，端口 5175） |
 | 存储 | MySQL（用户/公告/反馈/会话/消息/简历评分/知识库）、OSS（头像，阿里云 web-tlias-122） |
 
@@ -69,6 +70,7 @@
 | FAQ 精确匹配拦截层（高频产品/账号问题直接命中，跳过 RAG+LLM，命中 <100ms/0 token） | ✅ |
 | 知识库管理入口（管理后台在线增删改查知识段，DB 事实源 + 变更后异步重建三处索引） | ✅ |
 | 多轮历史融合检索 + 语义缓存（指代性问题融合历史 query；相同问题 20ms/0token 命中） | ✅ |
+| 缓存升级 Caffeine（语义/摘要缓存容量上限 + 过期原生管理，替代手写 ConcurrentHashMap 淘汰） | ✅ |
 | Git 提交（安全审查通过，分模块推送 GitHub） | ✅ |
 
 ## 五、量化成果（面试数据）
@@ -91,7 +93,8 @@
 - 上下文压缩：`memory/ContextCompressor`（token 预算裁剪 + LLM 摘要压缩 + 会话缓存）、`CareerMasterServiceImpl.buildPromptMessages`、配置 `app.memory.history-token-budget`/`enable-summary`/`summary-max-chars`
 - FAQ 拦截：`service/FaqService`（12 条 FAQ 库 + 归一化 + 精确/包含/相似度三级匹配）、`CareerMasterServiceImpl.tryFaq`（职规大师与超级智能体四个入口均接入）
 - 多轮融合检索：`CareerMasterServiceImpl.buildRagQuery`（最近 1-2 轮用户问题并入检索 query，截断 60 字）
-- 语义缓存：`service/SemanticCache`（归一化精确匹配 + 容量 200 + TTL 30min 滑动刷新，仅新会话首轮生效）、配置 `app.semantic-cache.*`
+- 语义缓存：`service/SemanticCache`（Caffeine：容量 200 + 写入 30min 过期 + recordStats，仅新会话首轮生效）、配置 `app.semantic-cache.*`
+- 会话摘要缓存：`memory/ContextCompressor`（Caffeine：容量 500 + 空闲 6h 过期，防旧会话堆积 OOM）、配置 `app.memory.summary-cache-*`
 - 协议：前端 `views/AgreementView`、路由 `/agreement`
 - 像素风：`styles/pixel.css`（工具类）、`components/PixelIcon.vue`（pixelarticons 像素图标）、依赖 `pixelarticons`/`@fontsource/press-start-2p`
 - 知识库：`resources/rag/career-tips.txt`（629 段种子源，仅首次导入用）；`entity/Knowledge` + `mapper/KnowledgeMapper` + `service/KnowledgeService`（DB 事实源，在线增删改查 + 异步全量重建 pgvector/BM25/八股缓存）；表 `knowledge`
@@ -145,10 +148,11 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - OSS AI 头像 key 双扩展名 bug：固定 key 上传不能走通用 upload（已修复）
 - Spring AI MCP 初始化 180s 超时 → 启动参数禁用
 - SearchReplace 偶发"partial success/save failed"可能是**真实回滚**：必须用 Grep/javap 验证关键代码是否真写入（AdminController 曾残留旧 class 导致新接口 404；对持续失败文件改用 Write 完整覆盖）；还可能**重复写入**（部分成功时方法插入两次，需 Grep 发现并清理重复）
-- 8080 端口被旧实例占用 → `Get-NetTCPConnection` 在该环境不可靠，用 `Get-CimInstance` 定位 java 进程 + `Stop-Process -Force -ErrorAction Stop` 并复核
+- 8080 端口被旧实例占用 → `Get-NetTCPConnection` 在该环境不可靠，用 `Get-CimInstance` 定位 java 进程 + `Stop-Process -Force -ErrorAction Stop` 并复核（注意：命令取多个 PID 时可能只停第一个，需逐一核对）
 - 简历评分同步接口实际耗时 30-40s > 前端 axios 全局超时 20s → 评分接口单独设 `timeout: 90000`
 - Vite 端口被占自动漂移（5175→5176）时后端 CORS 白名单需含该端口
 - 前端 `api/chatStream.ts` 用 fetch+ReadableStream，停止生成靠 AbortController，后端 `isClientDisconnected` 已兼容断连
 - 上下文压缩端到端验证：日志含「上下文预算裁剪/已生成对话摘要」即触发成功（中文日志在部分终端乱码属编码显示问题，不影响功能）
 - 知识库变更后异步重建约 30-40s（629 段 embedding），期间检索用旧索引，前端轮询 rebuild-status 感知完成
 - 语义缓存验证：日志出现「语义缓存命中」即生效；仅新会话首轮（无历史上下文）才缓存/命中，多轮对话不缓存防错配
+- 缓存规范：业务缓存统一用 Caffeine（容量上限 + 过期原生管理），禁止裸 ConcurrentHashMap 手写 TTL/淘汰；Redis 仅在多实例共享/跨重启持久/跨实例会话摘要时引入
