@@ -75,7 +75,9 @@ public class Bm25Retriever {
         }
     }
 
-    /** 重建索引（知识库变更后由管理入口调用）：以新段落列表构建内存索引并原子替换 */
+    /** 重建索引（知识库变更后由管理入口调用）：以新段落列表构建内存索引并原子替换。
+     * 旧 IndexSearcher 经 volatile 字段替换后无强引用残留，Lucene 内存目录（ByteBuffersDirectory）
+     * 随 GC 自动回收，不会内存泄漏。 */
     public synchronized void rebuild(List<String> paragraphs) {
         if (paragraphs == null || paragraphs.isEmpty()) {
             log.warn("BM25 重建跳过：知识库为空（保持旧索引不变）");

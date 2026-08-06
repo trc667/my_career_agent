@@ -2,9 +2,11 @@ package com.example.aimaster.memory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,8 +47,13 @@ public class ContextCompressor {
     private final int summaryMaxChars;
     private final boolean enableSummary;
 
-    /** 会话 ID → 已生成的摘要（含已覆盖的消息条数），避免每轮重复压缩 */
-    private final Map<String, CachedSummary> summaryCache = new ConcurrentHashMap<>();
+    /**
+     * 会话摘要缓存（Caffeine 本地缓存）：
+     * - maximumSize 容量上限：按预估最大在线会话数设置，防内存无限上涨 OOM；
+     * - expireAfterAccess 空闲过期：会话持续使用自动续期，长时间不用自动清理，防旧会话堆积；
+     * - recordStats 开启命中率统计（供监控）。
+     */
+    private final Cache<String, CachedSummary> summaryCache;
 
     /** 裁剪结果：保留的最近消息 + 早期对话摘要（可为空） */
     public record PreparedHistory(List<Message> keptMessages, String summary) {
@@ -58,11 +65,18 @@ public class ContextCompressor {
     public ContextCompressor(ChatModel chatModel,
                              @Value("${app.memory.history-token-budget:4000}") int historyTokenBudget,
                              @Value("${app.memory.summary-max-chars:800}") int summaryMaxChars,
-                             @Value("${app.memory.enable-summary:true}") boolean enableSummary) {
+                             @Value("${app.memory.enable-summary:true}") boolean enableSummary,
+                             @Value("${app.memory.summary-cache-max-size:500}") int summaryCacheMaxSize,
+                             @Value("${app.memory.summary-cache-ttl-minutes:360}") long summaryCacheTtlMinutes) {
         this.chatModel = chatModel;
         this.historyTokenBudget = Math.max(200, historyTokenBudget);
         this.summaryMaxChars = Math.max(100, summaryMaxChars);
         this.enableSummary = enableSummary;
+        this.summaryCache = Caffeine.newBuilder()
+                .maximumSize(Math.max(10, summaryCacheMaxSize))
+                .expireAfterAccess(Math.max(10, summaryCacheTtlMinutes), TimeUnit.MINUTES)
+                .recordStats()
+                .build();
     }
 
     /** 估算文本 token 数：中文约 1 token ≈ 1.6 字符（qwen 分词近似，预算裁剪取保守值） */
@@ -101,7 +115,7 @@ public class ContextCompressor {
         log.info("上下文预算裁剪: 会话 {} 历史 {} 条，保留最近 {} 条，丢弃 {} 条需压缩",
                 conversationId, history.size(), kept.size(), dropped.size());
         // 摘要缓存：本次丢弃完全被旧摘要覆盖则直接复用
-        CachedSummary cached = summaryCache.get(conversationId);
+        CachedSummary cached = summaryCache.getIfPresent(conversationId);
         if (cached != null && cached.messageCount() >= dropped.size()) {
             log.info("复用会话摘要缓存: 会话 {}（覆盖 {} 条，摘要 {} 字）", conversationId, cached.messageCount(), cached.summary().length());
             return new PreparedHistory(kept, cached.summary());
@@ -153,8 +167,13 @@ public class ContextCompressor {
     /** 清空某会话的摘要缓存（会话删除时调用，避免残留） */
     public void evict(String conversationId) {
         if (conversationId != null) {
-            summaryCache.remove(conversationId);
+            summaryCache.invalidate(conversationId);
         }
+    }
+
+    /** 缓存统计（命中率/计数，供监控面板接入） */
+    public com.github.benmanes.caffeine.cache.stats.CacheStats cacheStats() {
+        return summaryCache.stats();
     }
 
     private static String getText(Message m) {

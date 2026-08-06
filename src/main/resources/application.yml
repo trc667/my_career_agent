@@ -77,6 +77,9 @@ app:
     enable-summary: true
     # 摘要最大字符数（控制摘要本身占用的 token）
     summary-max-chars: 800
+    # 会话摘要缓存（Caffeine）：容量上限按预估最大在线会话数，空闲过期防旧会话堆积
+    summary-cache-max-size: 500
+    summary-cache-ttl-minutes: 360
     file:
       base-dir: ./data/chat-memory
   # RAG 文档切割（优化后：250 token/块减少发散，60 字下限防过碎）
