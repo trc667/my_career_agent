@@ -77,6 +77,45 @@
             </el-upload>
           </div>
         </el-tab-pane>
+
+        <!-- 错误日志 -->
+        <el-tab-pane label="错误日志" name="errors">
+          <div class="admin-toolbar admin-errors__toolbar">
+            <el-select v-model="errorSource" placeholder="全部来源" clearable size="small" style="width: 120px" @change="loadErrorLogs">
+              <el-option label="后端" value="backend" />
+              <el-option label="前端" value="frontend" />
+            </el-select>
+            <el-select v-model="errorLevel" placeholder="全部级别" clearable size="small" style="width: 120px" @change="loadErrorLogs">
+              <el-option label="ERROR" value="ERROR" />
+              <el-option label="WARN" value="WARN" />
+            </el-select>
+            <el-button size="small" type="danger" plain @click="handleClearErrorLogs">清空日志</el-button>
+          </div>
+          <el-table :data="errorLogs" stripe style="width: 100%">
+            <el-table-column type="expand">
+              <template #default="{ row }">
+                <pre class="admin-errors__stack">{{ row.stackTrace || '（无堆栈）' }}</pre>
+              </template>
+            </el-table-column>
+            <el-table-column label="时间" min-width="150">
+              <template #default="{ row }">{{ formatTime(row.createTime) }}</template>
+            </el-table-column>
+            <el-table-column label="来源" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.source === 'backend' ? 'danger' : 'warning'" size="small">{{ row.source }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="级别" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.level === 'ERROR' ? 'danger' : 'info'" size="small">{{ row.level }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="message" label="错误摘要" min-width="220" show-overflow-tooltip />
+            <el-table-column prop="uri" label="接口" min-width="140" show-overflow-tooltip />
+            <el-table-column prop="username" label="用户" width="90" />
+          </el-table>
+          <div v-if="errorLogs.length === 0" class="admin-empty">暂无错误日志</div>
+        </el-tab-pane>
       </el-tabs>
     </main>
 
@@ -110,14 +149,17 @@
 import { onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
+  clearAdminErrorLogs,
   createAnnouncement,
   deleteAnnouncement,
   deleteFeedback,
   getAdminAnnouncements,
+  getAdminErrorLogs,
   getAdminFeedbacks,
   getAdminUsers,
   updateAnnouncement,
   uploadAiAvatar,
+  type AdminErrorLog,
   type AdminFeedback,
   type AdminUser,
 } from '../api/admin';
@@ -128,6 +170,9 @@ const activeTab = ref('announcements');
 const announcements = ref<Notice[]>([]);
 const feedbacks = ref<AdminFeedback[]>([]);
 const users = ref<AdminUser[]>([]);
+const errorLogs = ref<AdminErrorLog[]>([]);
+const errorSource = ref('');
+const errorLevel = ref('');
 
 const annDialogVisible = ref(false);
 const editingAnn = ref<Notice | null>(null);
@@ -149,6 +194,31 @@ async function loadAll() {
     aiAvatar.value = ai.data?.avatar ?? '';
   } catch {
     // 403/401 由拦截器处理
+  }
+}
+
+/** 加载错误日志（可按来源/级别过滤） */
+async function loadErrorLogs() {
+  try {
+    const res = await getAdminErrorLogs({
+      source: errorSource.value || undefined,
+      level: errorLevel.value || undefined,
+    });
+    errorLogs.value = res.data ?? [];
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+/** 清空全部错误日志 */
+async function handleClearErrorLogs() {
+  try {
+    await ElMessageBox.confirm('确定清空全部错误日志吗？', '提示', { type: 'warning' });
+    await clearAdminErrorLogs();
+    ElMessage.success('已清空');
+    await loadErrorLogs();
+  } catch {
+    // 取消或失败
   }
 }
 
@@ -209,7 +279,10 @@ async function handleDeleteFeedback(id: number) {
   }
 }
 
-onMounted(loadAll);
+onMounted(() => {
+  loadAll();
+  loadErrorLogs();
+});
 </script>
 
 <style scoped>
@@ -330,6 +403,31 @@ onMounted(loadAll);
 .admin-ann__actions,
 .admin-fb__actions {
   text-align: right;
+}
+
+/* 错误日志面板 */
+.admin-errors__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-sm);
+  flex-wrap: wrap;
+}
+
+.admin-errors__stack {
+  margin: 0;
+  padding: var(--app-space-md);
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--app-text-secondary);
+}
+
+.theme-dark .admin-errors__stack {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .admin-page__bg {

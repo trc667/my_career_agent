@@ -98,3 +98,20 @@ CREATE TABLE IF NOT EXISTS resume_review (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     KEY idx_resume_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 错误日志表（自建监控上报：后端 GlobalExceptionHandler 自动入库 + 前端全局捕获上报）
+CREATE TABLE IF NOT EXISTS error_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    level VARCHAR(16) DEFAULT 'ERROR',
+    source VARCHAR(16) DEFAULT 'backend',
+    message VARCHAR(2000) NOT NULL,
+    stack_trace TEXT,
+    uri VARCHAR(512) DEFAULT '',
+    method VARCHAR(16) DEFAULT '',
+    username VARCHAR(64) DEFAULT '',
+    user_agent VARCHAR(512) DEFAULT '',
+    ip VARCHAR(64) DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_error_created (created_at),
+    KEY idx_error_source (source)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

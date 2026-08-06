@@ -1,6 +1,8 @@
 package com.example.aimaster.exception;
 
 import com.example.aimaster.dto.Result;
+import com.example.aimaster.service.ErrorLogService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -27,6 +29,12 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    private final ErrorLogService errorLogService;
+
+    public GlobalExceptionHandler(ErrorLogService errorLogService) {
+        this.errorLogService = errorLogService;
+    }
 
     /** 参数校验失败（@Valid）：如消息为空、超长等 */
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -83,14 +91,34 @@ public class GlobalExceptionHandler {
     /** 其他未捕获异常：打日志 + 控制台输出堆栈，便于排查 */
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public Result<?> handleOther(Exception e) {
+    public Result<?> handleOther(Exception e, HttpServletRequest request) {
         log.error("未捕获异常", e);
         // 确保异常堆栈输出到控制台，方便本地排查
         e.printStackTrace();
+        // 自建监控：500 级错误自动入库（入库失败不影响响应）
+        try {
+            String uri = request != null ? request.getRequestURI() : "";
+            String method = request != null ? request.getMethod() : "";
+            errorLogService.reportBackend(e.getMessage(), stackTraceOf(e), uri, method);
+        } catch (Exception ignored) {
+            // 监控入库失败不阻塞主流程
+        }
         String msg = e.getMessage() != null ? e.getMessage() : "服务异常，请稍后重试";
         if (msg.length() > 200) msg = msg.substring(0, 197) + "...";
         String hint = e.getClass().getSimpleName() + ": " + msg;
         return Result.fail(500, hint);
+    }
+
+    /** 截取堆栈前若干行（防止超长入库） */
+    private String stackTraceOf(Throwable e) {
+        StackTraceElement[] trace = e.getStackTrace();
+        if (trace == null || trace.length == 0) return e.toString();
+        StringBuilder sb = new StringBuilder(e.toString()).append("\n");
+        int limit = Math.min(trace.length, 20);
+        for (int i = 0; i < limit; i++) {
+            sb.append("\tat ").append(trace[i]).append("\n");
+        }
+        return sb.toString();
     }
     /** 限流：请求过于频繁 */
     @ExceptionHandler(RequestNotPermitted.class)

@@ -112,4 +112,9 @@ resilience4j:
         limitForPeriod: ${RATE_LIMIT_PER_MINUTE:20}
         limitRefreshPeriod: 60s
         timeoutDuration: 0   # 不等待，超限直接 429
+      # 错误上报接口限流（公开接口防刷）：每分钟 60 次
+      monitorLimiter:
+        limitForPeriod: 60
+        limitRefreshPeriod: 60s
+        timeoutDuration: 0
 

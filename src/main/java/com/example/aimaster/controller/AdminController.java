@@ -11,6 +11,7 @@ import com.example.aimaster.mapper.AnnouncementMapper;
 import com.example.aimaster.mapper.FeedbackMapper;
 import com.example.aimaster.mapper.UserMapper;
 import com.example.aimaster.service.OssStorageService;
+import com.example.aimaster.service.ErrorLogService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,15 +41,18 @@ public class AdminController {
     private final FeedbackMapper feedbackMapper;
     private final UserMapper userMapper;
     private final OssStorageService ossStorageService;
+    private final ErrorLogService errorLogService;
 
     public AdminController(AnnouncementMapper announcementMapper,
                            FeedbackMapper feedbackMapper,
                            UserMapper userMapper,
-                           OssStorageService ossStorageService) {
+                           OssStorageService ossStorageService,
+                           ErrorLogService errorLogService) {
         this.announcementMapper = announcementMapper;
         this.feedbackMapper = feedbackMapper;
         this.userMapper = userMapper;
         this.ossStorageService = ossStorageService;
+        this.errorLogService = errorLogService;
     }
 
     /* ===== 公告管理 ===== */
@@ -132,5 +136,23 @@ public class AdminController {
         Map<String, Object> data = new HashMap<>();
         data.put("avatar", url);
         return Result.ok(data);
+    }
+
+    /* ===== 错误日志（自建监控面板） ===== */
+
+    /** GET /api/admin/error-logs 错误日志列表（倒序，可按来源/级别过滤） */
+    @GetMapping("/error-logs")
+    public Result<List<com.example.aimaster.entity.ErrorLog>> errorLogs(
+            @RequestParam(required = false) String source,
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false, defaultValue = "100") int limit) {
+        return Result.ok(errorLogService.list(source, level, limit));
+    }
+
+    /** DELETE /api/admin/error-logs 清空错误日志 */
+    @DeleteMapping("/error-logs")
+    public Result<Void> clearErrorLogs() {
+        errorLogService.clear();
+        return Result.ok("已清空", null);
     }
 }

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { ElMessage } from 'element-plus';
 import router from '../router';
+import { reportError } from '../utils/errorMonitor';
 
 const http = axios.create({
   // 本地 dev 由 .env.development 指定；生产部署留空走同域（Netlify _redirects 代理 /api）
@@ -54,6 +55,16 @@ http.interceptors.response.use(
       error?.response?.data?.msg ||
       error?.message ||
       '请求失败，请稍后重试';
+    // 5xx 服务端错误自动上报监控（上报走原生 fetch，不经过本拦截器，无循环）
+    if (status && status >= 500) {
+      reportError({
+        source: 'frontend',
+        level: 'ERROR',
+        message: msg,
+        uri: url,
+        method: String(error?.config?.method ?? ''),
+      });
+    }
     ElMessage.error(msg);
     return Promise.reject(error);
   },

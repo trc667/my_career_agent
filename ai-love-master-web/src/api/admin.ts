@@ -26,6 +26,20 @@ export interface AnnouncementPayload {
   content: string;
 }
 
+export interface AdminErrorLog {
+  id: number;
+  level: string;
+  source: string;
+  message: string;
+  stackTrace?: string;
+  uri?: string;
+  method?: string;
+  username?: string;
+  userAgent?: string;
+  ip?: string;
+  createTime?: string;
+}
+
 /* 公告管理 */
 export function getAdminAnnouncements() {
   return http.get<any, ResultWrapper<Notice[]>>('/api/admin/announcements');
@@ -62,4 +76,13 @@ export function uploadAiAvatar(file: File) {
   const fd = new FormData();
   fd.append('file', file);
   return http.post<any, ResultWrapper<{ avatar: string }>>('/api/admin/ai-avatar', fd);
+}
+
+/* 错误日志（自建监控面板） */
+export function getAdminErrorLogs(params?: { source?: string; level?: string; limit?: number }) {
+  return http.get<any, ResultWrapper<AdminErrorLog[]>>('/api/admin/error-logs', { params });
+}
+
+export function clearAdminErrorLogs() {
+  return http.delete<any, ResultWrapper<null>>('/api/admin/error-logs');
 }
