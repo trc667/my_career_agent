@@ -52,6 +52,12 @@
           还没有账号？
           <router-link to="/register" class="auth-switch__link">立即注册</router-link>
         </p>
+        <p class="auth-agreement">
+          登录即代表同意
+          <router-link to="/agreement" target="_blank" class="auth-agreement__link">《用户协议》</router-link>
+          与
+          <router-link to="/agreement" target="_blank" class="auth-agreement__link">《隐私政策》</router-link>
+        </p>
       </el-form>
     </div>
 
@@ -155,9 +161,9 @@ async function handleLogin() {
   max-width: 400px;
   padding: 36px 32px;
   background: var(--app-card);
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-lg);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+  border: 2px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  box-shadow: 0 4px 0 var(--app-border), 0 12px 40px rgba(0, 0, 0, 0.08);
   text-align: center;
   animation: app-fade-up 0.5s ease both;
 }
@@ -166,7 +172,7 @@ async function handleLogin() {
   width: 48px;
   height: 48px;
   margin: 0 auto var(--app-space-md);
-  border-radius: 14px;
+  border-radius: 4px;
   background: linear-gradient(135deg, #409eff, #5db2ff);
   color: #fff;
   font-weight: 800;
@@ -174,7 +180,7 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 18px rgba(64, 158, 255, 0.35);
+  box-shadow: 3px 3px 0 rgba(64, 158, 255, 0.55);
 }
 
 .auth-title {
@@ -200,15 +206,23 @@ async function handleLogin() {
 
 .auth-submit {
   width: 100%;
-  border-radius: 9999px;
+  border-radius: 3px;
   font-weight: 600;
   background: #409eff;
   border: none;
-  box-shadow: 0 4px 18px rgba(64, 158, 255, 0.4);
+  box-shadow: 0 4px 0 #2f7fd6;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.2s ease;
 }
 
 .auth-submit:hover {
-  box-shadow: 0 6px 22px rgba(64, 158, 255, 0.5);
+  box-shadow: 0 6px 0 #2f7fd6;
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.auth-submit:active {
+  box-shadow: 0 0 0 #2f7fd6;
+  transform: translateY(4px);
 }
 
 .auth-switch {
@@ -222,6 +236,22 @@ async function handleLogin() {
   color: var(--app-accent-blue);
   text-decoration: none;
   margin-left: 4px;
+}
+
+.auth-agreement {
+  margin: var(--app-space-sm) 0 0;
+  font-size: 12px;
+  color: var(--app-text-secondary);
+  text-align: center;
+}
+
+.auth-agreement__link {
+  color: var(--app-accent-blue);
+  text-decoration: none;
+}
+
+.auth-agreement__link:hover {
+  text-decoration: underline;
 }
 
 .auth-switch__link:hover {

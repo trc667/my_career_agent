@@ -73,6 +73,10 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     public void register(RegisterRequest req) {
+        // 必须同意用户协议与隐私政策
+        if (!Boolean.TRUE.equals(req.getAgreed())) {
+            throw new BusinessException("请先阅读并同意用户协议与隐私政策");
+        }
         // 用户名唯一性
         User existingUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, req.getUsername()));
         if (existingUser != null) {

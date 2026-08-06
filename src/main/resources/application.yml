@@ -66,9 +66,9 @@ app:
   # 控制台交互：启用后可在运行应用的终端里输入问题，AI 在终端回复
   console:
     enabled: false
-  # 多轮对话记忆（文件持久化，重启不丢）
+  # 多轮对话记忆（MySQL 落库，跨设备可回看；file 为旧文件存储兼容）
   memory:
-    type: file
+    type: db
     max-messages-per-conversation: 20
     file:
       base-dir: ./data/chat-memory

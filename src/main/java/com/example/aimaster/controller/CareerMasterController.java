@@ -4,15 +4,21 @@ import com.example.aimaster.dto.ChatRequest;
 import com.example.aimaster.dto.ChatResponse;
 import com.example.aimaster.dto.ChatStreamSession;
 import com.example.aimaster.dto.CareerReport;
+import com.example.aimaster.entity.Conversation;
+import com.example.aimaster.entity.User;
 import com.example.aimaster.filter.SensitiveWordFilter;
 import com.example.aimaster.dto.ReportRequest;
 import com.example.aimaster.dto.Result;
+import com.example.aimaster.mapper.ConversationMapper;
 import com.example.aimaster.memory.ConversationMemoryStore;
+import com.example.aimaster.service.AuthService;
 import com.example.aimaster.service.CareerMasterService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.validation.Valid;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -50,13 +56,19 @@ public class CareerMasterController {
     private final CareerMasterService careerMasterService;
     private final ConversationMemoryStore memoryStore;
     private final SensitiveWordFilter sensitiveWordFilter;
+    private final ConversationMapper conversationMapper;
+    private final AuthService authService;
 
     public CareerMasterController(CareerMasterService careerMasterService,
                                 ConversationMemoryStore memoryStore,
-                                @Autowired(required = false) SensitiveWordFilter sensitiveWordFilter) {
+                                @Autowired(required = false) SensitiveWordFilter sensitiveWordFilter,
+                                ConversationMapper conversationMapper,
+                                AuthService authService) {
         this.careerMasterService = careerMasterService;
         this.memoryStore = memoryStore;
         this.sensitiveWordFilter = sensitiveWordFilter;
+        this.conversationMapper = conversationMapper;
+        this.authService = authService;
     }
 
 @RateLimiter(name = "chatLimiter")
@@ -123,6 +135,7 @@ public class CareerMasterController {
                                 ? sensitiveWordFilter.filter(fullReply.toString()) : fullReply.toString();
                         memoryStore.add(streamSession.conversationId(), new UserMessage(userToStore));
                         memoryStore.add(streamSession.conversationId(), new AssistantMessage(replyToStore));
+                        updateConversationTitleIfDefault(streamSession.conversationId(), userMessage);
                         emitter.send(SseEmitter.event().name("conversationId").data(streamSession.conversationId()));
                         Runnable completeTask = () -> { try { emitter.complete(); } catch (Exception ignored) {} };
                         CompletableFuture.delayedExecutor(150, TimeUnit.MILLISECONDS)
@@ -238,5 +251,32 @@ public class CareerMasterController {
     @GetMapping(value = "/health", produces = "application/json; charset=UTF-8")
     public Result<String> health() {
         return Result.ok("ok");
+    }
+
+    /**
+     * 会话标题为默认值时，用首条用户消息前 16 字自动更新（失败不影响主流程）。
+     */
+    private void updateConversationTitleIfDefault(String conversationId, String userMessage) {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null) return;
+            User user = authService.getUserInfo(auth.getName());
+            if (user == null) return;
+            Conversation conv = conversationMapper.selectOne(
+                    new LambdaQueryWrapper<Conversation>()
+                            .eq(Conversation::getUserId, user.getId())
+                            .eq(Conversation::getConversationId, conversationId));
+            if (conv == null) return;
+            boolean isDefault = conv.getTitle() == null
+                    || conv.getTitle().isEmpty()
+                    || "新的职规咨询".equals(conv.getTitle());
+            if (isDefault && userMessage != null && !userMessage.isBlank()) {
+                String t = userMessage.trim();
+                conv.setTitle(t.length() > 16 ? t.substring(0, 16) : t);
+                conversationMapper.updateById(conv);
+            }
+        } catch (Exception e) {
+            // 标题更新失败不影响主流程
+        }
     }
 }

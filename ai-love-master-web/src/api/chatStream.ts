@@ -20,6 +20,7 @@ export async function postChatStream(
   onChunk: (text: string) => void,
   onConversationId?: (id: string) => void,
   onError?: (err: string) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/api/chat/stream`, {
     method: 'POST',
@@ -28,6 +29,7 @@ export async function postChatStream(
       ...getAuthHeader(),
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!res.ok) {
@@ -109,6 +111,7 @@ export async function postChatReactStream(
   maxSteps: number,
   onEvent: (ev: ReactStreamEvent) => void,
   onError?: (err: string) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const res = await fetch(
     `${API_BASE}/api/chat/react/stream?maxSteps=${maxSteps}`,
@@ -120,6 +123,7 @@ export async function postChatReactStream(
         ...getAuthHeader(),
       },
       body: JSON.stringify(body),
+      signal,
     },
   );
 

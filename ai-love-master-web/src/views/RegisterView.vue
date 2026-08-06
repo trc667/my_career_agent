@@ -75,6 +75,14 @@
             </el-button>
           </div>
         </el-form-item>
+        <el-form-item prop="agreed" class="register-agreement">
+          <el-checkbox v-model="form.agreed">
+            我已阅读并同意
+            <router-link to="/agreement" target="_blank" class="register-agreement__link">《用户协议》</router-link>
+            和
+            <router-link to="/agreement" target="_blank" class="register-agreement__link">《隐私政策》</router-link>
+          </el-checkbox>
+        </el-form-item>
         <el-form-item>
           <el-button
             type="primary"
@@ -128,6 +136,7 @@ const form = reactive({
   confirmPassword: '',
   email: '',
   code: '',
+  agreed: false,
 });
 
 /** 邮箱格式校验（简单正则） */
@@ -172,6 +181,14 @@ const validateConfirm = (_rule: unknown, value: string, callback: (e?: Error) =>
   }
 };
 
+const validateAgreed = (_rule: unknown, value: boolean, callback: (e?: Error) => void) => {
+  if (!value) {
+    callback(new Error('请先阅读并同意用户协议与隐私政策'));
+  } else {
+    callback();
+  }
+};
+
 const rules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [
@@ -190,6 +207,7 @@ const rules: FormRules = {
     { required: true, message: '请输入验证码', trigger: 'blur' },
     { pattern: /^\d{6}$/, message: '验证码为6位数字', trigger: 'blur' },
   ],
+  agreed: [{ validator: validateAgreed, trigger: 'change' }],
 };
 
 async function handleRegister() {
@@ -203,6 +221,7 @@ async function handleRegister() {
         password: form.password,
         email: form.email.trim(),
         code: form.code.trim(),
+        agreed: form.agreed,
       });
       ElMessage.success('注册成功，已自动登录，正在跳转…');
       const redirect = (route.query.redirect as string) || '/';
@@ -259,9 +278,9 @@ async function handleRegister() {
   max-width: 400px;
   padding: 36px 32px;
   background: var(--app-card);
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-lg);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+  border: 2px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  box-shadow: 0 4px 0 var(--app-border), 0 12px 40px rgba(0, 0, 0, 0.08);
   text-align: center;
   animation: app-fade-up 0.5s ease both;
 }
@@ -270,7 +289,7 @@ async function handleRegister() {
   width: 48px;
   height: 48px;
   margin: 0 auto var(--app-space-md);
-  border-radius: 14px;
+  border-radius: 4px;
   background: linear-gradient(135deg, #409eff, #5db2ff);
   color: #fff;
   font-weight: 800;
@@ -278,7 +297,7 @@ async function handleRegister() {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 18px rgba(64, 158, 255, 0.35);
+  box-shadow: 3px 3px 0 rgba(64, 158, 255, 0.55);
 }
 
 .auth-title {
@@ -322,15 +341,23 @@ async function handleRegister() {
 
 .auth-submit {
   width: 100%;
-  border-radius: 9999px;
+  border-radius: 3px;
   font-weight: 600;
   background: #409eff;
   border: none;
-  box-shadow: 0 4px 18px rgba(64, 158, 255, 0.4);
+  box-shadow: 0 4px 0 #2f7fd6;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.2s ease;
 }
 
 .auth-submit:hover {
-  box-shadow: 0 6px 22px rgba(64, 158, 255, 0.5);
+  box-shadow: 0 6px 0 #2f7fd6;
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.auth-submit:active {
+  box-shadow: 0 0 0 #2f7fd6;
+  transform: translateY(4px);
 }
 
 .auth-switch {
@@ -347,6 +374,25 @@ async function handleRegister() {
 }
 
 .auth-switch__link:hover {
+  text-decoration: underline;
+}
+
+/* 协议勾选 */
+.register-agreement {
+  margin-bottom: var(--app-space-sm);
+}
+
+.register-agreement :deep(.el-checkbox__label) {
+  font-size: 13px;
+  color: var(--app-text-secondary);
+}
+
+.register-agreement__link {
+  color: var(--app-accent-blue);
+  text-decoration: none;
+}
+
+.register-agreement__link:hover {
   text-decoration: underline;
 }
 

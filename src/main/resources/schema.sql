@@ -64,3 +64,37 @@ CREATE TABLE IF NOT EXISTS announcement (
 INSERT INTO announcement (title, content)
 SELECT '欢迎使用 AI 职规助手', '欢迎使用 AI 职规助手！这里为你提供职业规划、学习路线、校招备战、面试辅导等服务。\n\n有问题可以直接和「AI 职规大师」对话，或让「AI 超级智能体」帮你规划任务。祝学习顺利！'
 WHERE NOT EXISTS (SELECT 1 FROM announcement);
+
+-- 对话会话表（跨设备同步聊天历史）：conversation_id 为后端生成的 UUID，同时作为记忆存储的会话主键
+CREATE TABLE IF NOT EXISTS conversation (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    conversation_id VARCHAR(64) NOT NULL,
+    title VARCHAR(128) DEFAULT '新的职规咨询',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_conversation_conv_id (conversation_id),
+    KEY idx_conversation_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 对话消息表（完整历史落库）：role 为 user/assistant
+CREATE TABLE IF NOT EXISTS conversation_message (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    conversation_id VARCHAR(64) NOT NULL,
+    role VARCHAR(16) NOT NULL,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_cmsg_conversation (conversation_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 简历评分记录表：detail_json 存完整评分明细（维度/亮点/不足/优化版简历）
+CREATE TABLE IF NOT EXISTS resume_review (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    target_position VARCHAR(128) DEFAULT '',
+    resume_text TEXT NOT NULL,
+    total_score INT NOT NULL,
+    detail_json TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_resume_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

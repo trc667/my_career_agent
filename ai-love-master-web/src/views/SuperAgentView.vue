@@ -47,9 +47,11 @@
       <el-footer class="chat-layout__footer">
         <ChatInputBar
           :disabled="loading || typing"
+          :typing="typing"
           placeholder="输入任务或问题…（Enter 发送，Ctrl/⌘+Enter 换行）"
           @send="handleSend"
           @clear="handleClear"
+          @stop="stopGenerating"
         />
       </el-footer>
     </el-container>
@@ -79,6 +81,7 @@ const router = useRouter();
 const store = useSuperAgentStore();
 const authStore = useAuthStore();
 const streamingContent = ref('');
+const abortCtrl = ref<AbortController | null>(null);
 const typewriter = useStreamTypewriter((content) => {
   streamingContent.value = content;
   store.replaceLastAssistantMessage(content);
@@ -132,6 +135,9 @@ async function handleSend(text: string) {
   streamingContent.value = '';
   typewriter.reset();
 
+  const ctrl = new AbortController();
+  abortCtrl.value = ctrl;
+
   try {
     await postChatReactStream(
       {
@@ -183,9 +189,13 @@ async function handleSend(text: string) {
         }
       },
       (err) => ElMessage.error(err),
+      ctrl.signal,
     );
-  } catch {
-    ElMessage.error('请求失败');
+  } catch (e: unknown) {
+    const aborted = (e as Error)?.name === 'AbortError';
+    if (!aborted) {
+      ElMessage.error('请求失败');
+    }
   } finally {
     typewriter.stop();
     const final = streamingContent.value;
@@ -193,7 +203,13 @@ async function handleSend(text: string) {
     streamingContent.value = '';
     loading.value = false;
     typing.value = false;
+    abortCtrl.value = null;
   }
+}
+
+/** 停止生成：中断 ReAct 流，保留已生成内容为最终回复 */
+function stopGenerating() {
+  abortCtrl.value?.abort();
 }
 
 function handleClear() {

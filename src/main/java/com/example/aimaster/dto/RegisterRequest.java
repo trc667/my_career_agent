@@ -1,5 +1,6 @@
 package com.example.aimaster.dto;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -26,4 +27,8 @@ public class RegisterRequest {
     @NotBlank(message = "验证码不能为空")
     @Size(min = 6, max = 6, message = "验证码为6位数字")
     private String code;
+
+    /** 是否已阅读并同意用户协议与隐私政策（必填 true） */
+    @AssertTrue(message = "请先阅读并同意用户协议与隐私政策")
+    private Boolean agreed;
 }

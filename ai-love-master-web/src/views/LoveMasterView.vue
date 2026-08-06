@@ -16,7 +16,7 @@
         @open-career-path="showCareerPath = true"
         @open-skill-gap="showSkillGap = true"
         @open-exam-plan="showExamPlan = true"
-        @switch-conversation="store.switchConversation"
+        @switch-conversation="onSwitchConversation"
         @delete-conversation="store.deleteConversation"
       />
     </el-aside>
@@ -45,8 +45,10 @@
       <el-footer class="chat-layout__footer">
         <ChatInputBar
           :disabled="loading || typing"
+          :typing="typing"
           @send="handleSend"
           @clear="handleClear"
+          @stop="stopGenerating"
         />
       </el-footer>
     </el-container>
@@ -87,6 +89,7 @@ const router = useRouter();
 const store = useLoveMasterStore();
 const authStore = useAuthStore();
 const streamingContent = ref('');
+const abortCtrl = ref<AbortController | null>(null);
 const typewriter = useStreamTypewriter((content) => {
   streamingContent.value = content;
   store.replaceLastAssistantMessage(content);
@@ -106,8 +109,10 @@ function updateResponsive() {
   else sidebarOpen.value = true;
 }
 
-onMounted(() => {
+onMounted(async () => {
   updateResponsive();
+  // 先拉取云端会话，再确保存在当前会话（避免本地生成多余空会话）
+  await store.initFromServer();
   store.ensureCurrentConversation();
   authStore.fetchAvatar();
   window.addEventListener('resize', updateResponsive);
@@ -138,18 +143,28 @@ async function handleSend(text: string) {
   streamingContent.value = '';
   typewriter.reset();
 
+  // 首条消息前确保会话已绑定云端（后端生成 conversationId）
+  const convId = await store.ensureBackendConversation();
+
+  const ctrl = new AbortController();
+  abortCtrl.value = ctrl;
+
   try {
     await postChatStream(
       {
         message: msg,
-        conversationId: currentConversation.value?.backendConversationId ?? '',
+        conversationId: convId ?? '',
       },
       (chunk) => typewriter.feed(chunk),
       (id) => store.setBackendConversationId(id),
       (err) => ElMessage.error(err),
+      ctrl.signal,
     );
-  } catch {
-    ElMessage.error('请求失败');
+  } catch (e: unknown) {
+    const aborted = (e as Error)?.name === 'AbortError';
+    if (!aborted) {
+      ElMessage.error('请求失败');
+    }
   } finally {
     typewriter.stop();
     const final = streamingContent.value;
@@ -157,7 +172,19 @@ async function handleSend(text: string) {
     streamingContent.value = '';
     loading.value = false;
     typing.value = false;
+    abortCtrl.value = null;
   }
+}
+
+/** 停止生成：中断 SSE 流，保留已生成内容为最终回复 */
+function stopGenerating() {
+  abortCtrl.value?.abort();
+}
+
+/** 切换会话：本地切换 + 尝试拉取云端消息（跨设备回看） */
+function onSwitchConversation(id: string) {
+  store.switchConversation(id);
+  store.loadMessages(id);
 }
 
 function handleClear() {
