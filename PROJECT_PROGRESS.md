@@ -2,9 +2,19 @@
 
 > 用途：新开会话时先读本文件，快速恢复项目上下文。完整 RAG 实验细节见 `RAG_OPTIMIZATION_SUMMARY.md`。
 
-## 一、项目简介
+## 一、项目背景与简介
 
-**AI 计算机学生职规大师智能体**：Spring Boot 后端 + Vue3 前端的 AI 对话应用，核心卖点是**企业级 RAG 检索增强生成**。
+**项目缘起**：计算机专业学生求职竞争激烈，普遍面临「方向迷茫、学习无体系、简历不会写、八股记不住」四大痛点；市面 AI 助手回答泛泛、不贴合 CS 求职场景。本项目定位为「**计算机学生的一站式求职 AI 助手**」，用企业级 RAG 技术把 629 段高质量职规知识变成个性化回答，并提供练习/评分/记录等留存闭环。
+
+**目标用户**：计算机专业在读学生、应届毕业生（校招/实习求职者）。
+
+**核心价值**：
+1. 回答可信：RAG 检索增强 + 【来源】标注，拒绝瞎编（无知识拒答）
+2. 场景齐全：职规咨询 / 简历评分 / 八股练习 / 超级智能体跑任务
+3. 留存闭环：错题本 + 每日打卡 + 聊天历史跨设备同步
+4. 工程可运维：自建错误监控 + 数据库备份 + 全站像素风 UI
+
+**技术概览**：Spring Boot 后端 + Vue3 前端，核心卖点是**企业级 RAG 检索增强生成**（Recall@1 78%、MRR 0.85）。
 
 | 层 | 技术 |
 |---|---|
@@ -53,6 +63,8 @@
 | 全站像素风排版改造（像素图标/字体/按钮/卡片/装饰/动效） | ✅ |
 | 八股错题本 + 每日打卡 + 学习统计（/bagu-practice 独立页） | ✅ |
 | 聊天问答反馈（👍/👎）+ 重新生成 + 复制（两个聊天页） | ✅ |
+| 上下文压缩 + token 预算（历史超预算早期对话 LLM 摘要占位，会话缓存复用） | ✅ |
+| FAQ 精确匹配拦截层（高频产品/账号问题直接命中，跳过 RAG+LLM，命中 <100ms/0 token） | ✅ |
 | Git 提交（安全审查通过，分模块推送 GitHub） | ✅ |
 
 ## 五、量化成果（面试数据）
@@ -70,6 +82,8 @@
 - 八股：`service/BaguService`、`controller/BaguController`、`views/BaguView`
 - 简历：`service/ResumeReviewService`、`controller/ResumeController`、`dto/ResumeReview*`、前端 `views/ResumeReviewView`、`api/resume.ts`、表 `resume_review`
 - 聊天历史：`controller/ConversationController`、`memory/DbConversationMemoryStore`、`config/MemoryConfig`、前端 `store/loveMasterStore`、`api/conversation.ts`、表 `conversation`/`conversation_message`
+- 上下文压缩：`memory/ContextCompressor`（token 预算裁剪 + LLM 摘要压缩 + 会话缓存）、`CareerMasterServiceImpl.buildPromptMessages`、配置 `app.memory.history-token-budget`/`enable-summary`/`summary-max-chars`
+- FAQ 拦截：`service/FaqService`（12 条 FAQ 库 + 归一化 + 精确/包含/相似度三级匹配）、`CareerMasterServiceImpl.tryFaq`（职规大师与超级智能体四个入口均接入）
 - 协议：前端 `views/AgreementView`、路由 `/agreement`
 - 像素风：`styles/pixel.css`（工具类）、`components/PixelIcon.vue`（pixelarticons 像素图标）、依赖 `pixelarticons`/`@fontsource/press-start-2p`
 - 知识库：`resources/rag/career-tips.txt`（629 段，唯一事实源）
@@ -96,9 +110,9 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 ### P1 留存核心 + 用户体验 + 工程质量
 - [x] 八股练习场错题本 + 学习进度/打卡
 - [x] 聊天内问答反馈（点赞/点踩）+ 重新生成
-- [ ] 上下文压缩/token 预算
-- [ ] FAQ 精确匹配拦截层
-- [ ] 自动化测试 + CI/CD + 接口文档
+- [x] 上下文压缩/token 预算
+- [x] FAQ 精确匹配拦截层
+- [ ] 自动化测试 + CI/CD + 接口文档 —— 【暂缓】单人开发，此类工程化工具收益低，待有团队协作需求再做
 
 ### P2 RAG 进阶 + 架构 + 商业化起步
 - [ ] 多轮历史融合检索、语义缓存
@@ -125,3 +139,4 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - 简历评分同步接口实际耗时 30-40s > 前端 axios 全局超时 20s → 评分接口单独设 `timeout: 90000`
 - Vite 端口被占自动漂移（5175→5176）时后端 CORS 白名单需含该端口
 - 前端 `api/chatStream.ts` 用 fetch+ReadableStream，停止生成靠 AbortController，后端 `isClientDisconnected` 已兼容断连
+- 上下文压缩端到端验证：日志含「上下文预算裁剪/已生成对话摘要」即触发成功（中文日志在部分终端乱码属编码显示问题，不影响功能）
