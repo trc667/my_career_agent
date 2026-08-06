@@ -6,6 +6,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,8 +25,8 @@ import java.util.Random;
 @Service
 public class BaguService {
 
-    /** 一条八股知识点 */
-    public record BaguEntry(String content, String category) {
+    /** 一条八股知识点（id 为内容 SHA-256 前 12 位 hex，内容不变则 id 稳定，供错题本引用） */
+    public record BaguEntry(String id, String content, String category) {
         /** 列表摘要：取前 60 字 */
         public String summary() {
             return content.length() > 60 ? content.substring(0, 60) + "…" : content;
@@ -51,7 +52,7 @@ public class BaguService {
             for (String part : content.split("\\n\\s*\\n")) {
                 String s = part.trim();
                 if (s.isEmpty() || s.startsWith("#")) continue;
-                entries.add(new BaguEntry(s, RagDocumentLoader.autoTag(s)));
+                entries.add(new BaguEntry(hashId(s), s, RagDocumentLoader.autoTag(s)));
             }
             log.info("八股知识库加载完成：{} 段", entries.size());
         } catch (Exception e) {
@@ -86,6 +87,21 @@ public class BaguService {
             result.add(m);
         });
         return result;
+    }
+
+    /** 稳定 ID：SHA-256 前 12 位 hex（内容不变则 id 不变） */
+    static String hashId(String text) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(text.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < 6; i++) { // 6 字节 = 12 hex
+                sb.append(String.format("%02x", digest[i]));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return Integer.toHexString(text.hashCode());
+        }
     }
 
     /** 随机抽题：可限定分类；无候选时返回 null */

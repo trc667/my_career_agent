@@ -31,6 +31,7 @@
           </template>
         </el-input>
         <el-button type="warning" class="bagu-toolbar__random" @click="handleRandom">🎲 随机一题</el-button>
+        <router-link to="/bagu-practice" class="bagu-toolbar__practice">📖 学习记录</router-link>
       </div>
 
       <!-- 列表 -->
@@ -77,6 +78,7 @@
       </template>
       <template #footer>
         <el-button @click="handleRandom">再抽一题</el-button>
+        <el-button type="danger" plain :loading="wrongLoading" @click="handleAddWrong(randomItem)">不会 / 答错，加入错题本</el-button>
         <el-button type="primary" :loading="explainLoading" @click="handleExplain(randomItem)">🤖 AI 讲解</el-button>
       </template>
     </el-dialog>
@@ -100,8 +102,9 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { ElMessage } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
-import { getBaguCategories, getBaguList, getBaguRandom, type BaguCategory, type BaguEntry } from '../api/bagu';
+import { getBaguCategories, getBaguList, getBaguRandom, addBaguWrong, type BaguCategory, type BaguEntry } from '../api/bagu';
 import { postChatRag } from '../api/chat';
 import { renderMarkdown } from '../utils/markdown';
 
@@ -117,6 +120,7 @@ const expanded = ref<Record<number, boolean>>({});
 
 const randomVisible = ref(false);
 const randomItem = ref<BaguEntry | null>(null);
+const wrongLoading = ref(false);
 const explainVisible = ref(false);
 const explainLoading = ref(false);
 const explainText = ref('');
@@ -180,6 +184,24 @@ async function handleRandom() {
     randomVisible.value = true;
   } catch {
     // 拦截器提示
+  }
+}
+
+/** 加入错题本（不会/答错时） */
+async function handleAddWrong(item: BaguEntry | null) {
+  if (!item) return;
+  wrongLoading.value = true;
+  try {
+    await addBaguWrong({
+      questionId: item.id,
+      category: item.category,
+      content: item.content,
+    });
+    ElMessage.success('已加入错题本，可去「学习记录」查看');
+  } catch {
+    // 拦截器已提示
+  } finally {
+    wrongLoading.value = false;
   }
 }
 

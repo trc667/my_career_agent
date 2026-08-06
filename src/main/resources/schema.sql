@@ -115,3 +115,26 @@ CREATE TABLE IF NOT EXISTS error_log (
     KEY idx_error_created (created_at),
     KEY idx_error_source (source)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 八股错题本：question_id 为题目内容 hash，同一用户同一题唯一（重复答错累计次数）
+CREATE TABLE IF NOT EXISTS bagu_wrong (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    question_id VARCHAR(32) NOT NULL,
+    question_content TEXT NOT NULL,
+    category VARCHAR(32) DEFAULT '',
+    wrong_count INT DEFAULT 1,
+    last_wrong_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    mastered TINYINT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_wrong_user_q (user_id, question_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 八股每日打卡：同用户同日期唯一（幂等）
+CREATE TABLE IF NOT EXISTS bagu_checkin (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    checkin_date DATE NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_checkin_user_date (user_id, checkin_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
