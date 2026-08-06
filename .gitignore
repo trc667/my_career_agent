@@ -17,6 +17,9 @@ application-dev.yml
 # 本地数据（对话记录等）
 data/
 
+# 数据库备份（勿提交）
+backups/
+
 # 前端依赖
 ai-love-master-web/node_modules/
 ai-love-master-web/.vite/
