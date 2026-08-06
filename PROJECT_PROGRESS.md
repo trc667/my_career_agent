@@ -23,7 +23,7 @@
 | 向量库 | PostgreSQL 18 + pgvector 0.8.6（HNSW，双数据源：MySQL 业务 + PG 向量） |
 | 稀疏检索 | Lucene 9.11（IK-analyzer ik_smart 中文分词）+ BM25Similarity |
 | 前端 | Vue3 + TS + Vite + Element Plus（`ai-love-master-web`，端口 5175） |
-| 存储 | MySQL（用户/公告/反馈/会话/消息/简历评分）、OSS（头像，阿里云 web-tlias-122） |
+| 存储 | MySQL（用户/公告/反馈/会话/消息/简历评分/知识库）、OSS（头像，阿里云 web-tlias-122） |
 
 ## 二、RAG 六流程（生产链路已全部接入）
 
@@ -42,7 +42,9 @@
 5. **AI 简历评分**（/resume-review）：粘贴简历 → 结合 RAG 知识库 6 维度评分 + 亮点/不足 + 优化版简历，结果入库历史回看（`ResumeReviewService`/`ResumeController`/`ResumeReviewView`）
 6. **聊天历史管理 + 停止生成**：会话/消息全量入库 MySQL，跨设备同步；职规大师与超级智能体流式可中断（`ConversationController`/`DbConversationMemoryStore`/`MemoryConfig`）
 7. **用户协议/隐私政策**：/agreement 页面 + 注册强制勾选（前后端双重校验）+ 首页/登录页入口
-8. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置)、意见反馈、限流
+8. **知识库管理入口**（管理后台「知识库管理」tab）：629 段知识在线增删改查 + 启停，变更后异步重建 pgvector/BM25/八股三处索引（`KnowledgeService`/`AdminController`/`AdminView.vue`）
+9. **多轮历史融合检索 + 语义缓存**：检索 query 并入最近 1-2 轮历史问题（指代性问题召回提升）；相同独立问题 30 分钟内直接命中缓存答案（20ms/0 token）（`CareerMasterServiceImpl.buildRagQuery`/`SemanticCache`）
+10. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
 
 ## 四、本轮任务进度（已完成并验证）
 
@@ -65,6 +67,8 @@
 | 聊天问答反馈（👍/👎）+ 重新生成 + 复制（两个聊天页） | ✅ |
 | 上下文压缩 + token 预算（历史超预算早期对话 LLM 摘要占位，会话缓存复用） | ✅ |
 | FAQ 精确匹配拦截层（高频产品/账号问题直接命中，跳过 RAG+LLM，命中 <100ms/0 token） | ✅ |
+| 知识库管理入口（管理后台在线增删改查知识段，DB 事实源 + 变更后异步重建三处索引） | ✅ |
+| 多轮历史融合检索 + 语义缓存（指代性问题融合历史 query；相同问题 20ms/0token 命中） | ✅ |
 | Git 提交（安全审查通过，分模块推送 GitHub） | ✅ |
 
 ## 五、量化成果（面试数据）
@@ -73,6 +77,8 @@
 - Baseline → Hybrid → +Rerank：Recall@5 83.5%→89.6%→93.9%；Recall@1 60.6%→64.5%→78.0%；MRR 0.69→0.85
 - 混合检索增益随数据量放大：228 段 +0.8% / 629 段 +6.1%
 - BM25 互补性：39/328 查询仅 BM25 命中向量漏检（全为专有名词类）
+- 知识库管理入口验证：新增→异步重建 33s→八股同步；启动重建 39s
+- 语义缓存验证：相同问题第二次命中 20ms / 0 token（对比首次 5.2s / 1335 token）
 
 ## 六、关键文件清单
 
@@ -84,9 +90,12 @@
 - 聊天历史：`controller/ConversationController`、`memory/DbConversationMemoryStore`、`config/MemoryConfig`、前端 `store/loveMasterStore`、`api/conversation.ts`、表 `conversation`/`conversation_message`
 - 上下文压缩：`memory/ContextCompressor`（token 预算裁剪 + LLM 摘要压缩 + 会话缓存）、`CareerMasterServiceImpl.buildPromptMessages`、配置 `app.memory.history-token-budget`/`enable-summary`/`summary-max-chars`
 - FAQ 拦截：`service/FaqService`（12 条 FAQ 库 + 归一化 + 精确/包含/相似度三级匹配）、`CareerMasterServiceImpl.tryFaq`（职规大师与超级智能体四个入口均接入）
+- 多轮融合检索：`CareerMasterServiceImpl.buildRagQuery`（最近 1-2 轮用户问题并入检索 query，截断 60 字）
+- 语义缓存：`service/SemanticCache`（归一化精确匹配 + 容量 200 + TTL 30min 滑动刷新，仅新会话首轮生效）、配置 `app.semantic-cache.*`
 - 协议：前端 `views/AgreementView`、路由 `/agreement`
 - 像素风：`styles/pixel.css`（工具类）、`components/PixelIcon.vue`（pixelarticons 像素图标）、依赖 `pixelarticons`/`@fontsource/press-start-2p`
-- 知识库：`resources/rag/career-tips.txt`（629 段，唯一事实源）
+- 知识库：`resources/rag/career-tips.txt`（629 段种子源，仅首次导入用）；`entity/Knowledge` + `mapper/KnowledgeMapper` + `service/KnowledgeService`（DB 事实源，在线增删改查 + 异步全量重建 pgvector/BM25/八股缓存）；表 `knowledge`
+- 知识库管理接口：`controller/AdminController`（/api/admin/knowledge*）+ 前端 `AdminView.vue`「知识库管理」tab + `api/admin.ts`
 - 配置：`application.yml`（公共）、`application-dev.yml`（敏感，不入库）、`application-raggen.yml`（批量生成）
 
 ## 七、运行环境与启动
@@ -98,8 +107,9 @@ mvn spring-boot:run "-Dspring-boot.run.arguments=--spring.profiles.active=dev"
 # 前端
 cd ai-love-master-web; npm run dev   # 5175，对接 8080
 ```
-- 测试账号：testuser01 / test123456；admin 账号 demo 需已在库（提升 ADMIN）
+- 测试账号：testuser01 / test123456；admin 账号 demo / 123456（已提升 ADMIN）
 - 知识库扩容：`mvn spring-boot:run "-Dspring-boot.run.arguments=--spring.profiles.active=raggen"`（topics 在 application-raggen.yml）
+- 管理后台：登录 demo → 访问 /admin（或登录页进入），「知识库管理」tab 在线维护知识段
 
 ## 八、待办（按 P 级排序）
 
@@ -115,9 +125,9 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - [ ] 自动化测试 + CI/CD + 接口文档 —— 【暂缓】单人开发，此类工程化工具收益低，待有团队协作需求再做
 
 ### P2 RAG 进阶 + 架构 + 商业化起步
-- [ ] 多轮历史融合检索、语义缓存
+- [x] 多轮历史融合检索、语义缓存
 - [ ] Prompt 结构优化 + HyDE 分流（简单问题标准 RAG，复杂问题 HyDE）
-- [ ] 知识库管理入口（管理后台在线增删改查知识段）
+- [x] 知识库管理入口（管理后台在线增删改查知识段）
 - [ ] docker-compose 编排
 - [ ] 商业化：积分/会员体系（用户分级免费/付费 + 签到积分 + 限流分级）
 - [ ] 商业化：分享裂变（分享海报/链接，邀请好友解锁次数）
@@ -134,9 +144,11 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - OSS `SignatureDoesNotMatch` = AK/Secret 错（Secret 必须 30 位随机串，控制台"显示"复制）
 - OSS AI 头像 key 双扩展名 bug：固定 key 上传不能走通用 upload（已修复）
 - Spring AI MCP 初始化 180s 超时 → 启动参数禁用
-- SearchReplace 偶发"partial success/save failed"误报 → 用 Grep/Read 验证实际写入
-- 8080 端口被旧实例占用 → `Get-NetTCPConnection` 查 PID + Stop-Process
+- SearchReplace 偶发"partial success/save failed"可能是**真实回滚**：必须用 Grep/javap 验证关键代码是否真写入（AdminController 曾残留旧 class 导致新接口 404；对持续失败文件改用 Write 完整覆盖）；还可能**重复写入**（部分成功时方法插入两次，需 Grep 发现并清理重复）
+- 8080 端口被旧实例占用 → `Get-NetTCPConnection` 在该环境不可靠，用 `Get-CimInstance` 定位 java 进程 + `Stop-Process -Force -ErrorAction Stop` 并复核
 - 简历评分同步接口实际耗时 30-40s > 前端 axios 全局超时 20s → 评分接口单独设 `timeout: 90000`
 - Vite 端口被占自动漂移（5175→5176）时后端 CORS 白名单需含该端口
 - 前端 `api/chatStream.ts` 用 fetch+ReadableStream，停止生成靠 AbortController，后端 `isClientDisconnected` 已兼容断连
 - 上下文压缩端到端验证：日志含「上下文预算裁剪/已生成对话摘要」即触发成功（中文日志在部分终端乱码属编码显示问题，不影响功能）
+- 知识库变更后异步重建约 30-40s（629 段 embedding），期间检索用旧索引，前端轮询 rebuild-status 感知完成
+- 语义缓存验证：日志出现「语义缓存命中」即生效；仅新会话首轮（无历史上下文）才缓存/命中，多轮对话不缓存防错配
