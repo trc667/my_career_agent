@@ -15,6 +15,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   createdAt: number;
+  feedback?: 'up' | 'down';
 }
 
 export interface Conversation {
@@ -244,6 +245,30 @@ export const useLoveMasterStore = defineStore('loveMaster', () => {
     if (conv) conv.backendConversationId = id;
   }
 
+  /** 本地设置/切换消息反馈（up/down） */
+  function setFeedback(msgId: string, type: 'up' | 'down') {
+    const conv = currentConversation.value;
+    if (!conv) return;
+    const msg = conv.messages.find((m) => m.id === msgId);
+    if (msg) {
+      msg.feedback = msg.feedback === type ? undefined : type;
+    }
+  }
+
+  /** 删除当前会话最后一条 AI 消息（重新生成用） */
+  function removeLastAssistant() {
+    const conv = currentConversation.value;
+    if (!conv) return;
+    for (let i = conv.messages.length - 1; i >= 0; i--) {
+      const msg = conv.messages[i];
+      if (msg && msg.role === 'assistant') {
+        conv.messages.splice(i, 1);
+        conv.updatedAt = now();
+        return;
+      }
+    }
+  }
+
   return {
     theme,
     loading,
@@ -261,6 +286,8 @@ export const useLoveMasterStore = defineStore('loveMaster', () => {
     addMessage,
     replaceLastAssistantMessage,
     setBackendConversationId,
+    setFeedback,
+    removeLastAssistant,
     initFromServer,
     ensureBackendConversation,
     loadMessages,

@@ -36,6 +36,8 @@
           :messages="currentConversation?.messages || []"
           :typing="typing"
           :streaming-content="typing ? streamingContent : null"
+          @feedback="handleFeedback"
+          @regenerate="regenerate"
         />
         <Transition name="hint-fade">
           <div v-if="loading || typing" class="super-agent__hint">
@@ -73,6 +75,7 @@ import {
   postChatReactStream,
   type ReactStreamEvent,
 } from '../api/chatStream';
+import { postChatFeedback } from '../api/chat';
 import { useStreamTypewriter } from '../composables/useStreamTypewriter';
 import { useSuperAgentStore } from '../store/superAgentStore';
 import { useAuthStore } from '../store/authStore';
@@ -128,6 +131,11 @@ async function handleSend(text: string) {
 
   store.ensureCurrentConversation();
   store.addMessage('user', msg);
+  await sendToAI(msg);
+}
+
+/** 发起 AI 请求（调用前已添加用户消息与 assistant 占位） */
+async function sendToAI(msg: string) {
   store.addMessage('assistant', '', []);
 
   loading.value = true;
@@ -205,6 +213,38 @@ async function handleSend(text: string) {
     typing.value = false;
     abortCtrl.value = null;
   }
+}
+
+/** 问答反馈：本地高亮 + 后端入库 */
+async function handleFeedback(payload: { messageId: string; type: 'up' | 'down' }) {
+  store.setFeedback(payload.messageId, payload.type);
+  const conversationId = store.currentConversation?.backendConversationId ?? '';
+  postChatFeedback({
+    conversationId,
+    messageId: payload.messageId,
+    feedbackType: payload.type,
+  }).catch(() => {
+    // 入库失败仅回滚本地高亮
+    store.setFeedback(payload.messageId, payload.type);
+  });
+}
+
+/** 重新生成：删除最后一条 AI 回复，用同一用户任务重跑 */
+async function regenerate() {
+  if (loading.value || typing.value) return;
+  const conv = store.currentConversation;
+  if (!conv) return;
+  let lastUser = '';
+  for (let i = conv.messages.length - 1; i >= 0; i--) {
+    const m = conv.messages[i];
+    if (m && m.role === 'user') {
+      lastUser = m.content;
+      break;
+    }
+  }
+  if (!lastUser) return;
+  store.removeLastAssistant();
+  await sendToAI(lastUser);
 }
 
 /** 停止生成：中断 ReAct 流，保留已生成内容为最终回复 */

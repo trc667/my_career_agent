@@ -18,6 +18,7 @@ export interface ChatMessage {
   content: string;
   createdAt: number;
   steps?: AssistantStep[];
+  feedback?: 'up' | 'down';
 }
 
 export interface Conversation {

@@ -138,3 +138,14 @@ CREATE TABLE IF NOT EXISTS bagu_checkin (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_checkin_user_date (user_id, checkin_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 聊天问答反馈：message_id 为前端消息 uuid，同用户同消息唯一（赞/踩可切换），沉淀供 RAG 优化
+CREATE TABLE IF NOT EXISTS chat_feedback (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    conversation_id VARCHAR(64) NOT NULL,
+    message_id VARCHAR(64) NOT NULL,
+    feedback_type VARCHAR(8) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_fb_user_msg (user_id, message_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

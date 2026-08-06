@@ -41,3 +41,12 @@ export function getHealth() {
   return http.get<any, ResultWrapper<string>>('/api/health');
 }
 
+/** 问答反馈（点赞/点踩一条 AI 回复） */
+export function postChatFeedback(payload: {
+  conversationId: string;
+  messageId: string;
+  feedbackType: 'up' | 'down';
+}) {
+  return http.post<any, ResultWrapper<null>>('/api/chat/feedback', payload);
+}
+

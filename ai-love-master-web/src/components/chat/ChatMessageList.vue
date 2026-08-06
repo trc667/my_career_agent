@@ -36,6 +36,34 @@
             class="pixel-caret"
           />
         </div>
+        <!-- AI 回复操作栏：反馈 / 复制 / 重新生成（生成中隐藏） -->
+        <div v-if="m.role === 'assistant' && !typing" class="chat-list__actions">
+          <button
+            class="chat-list__action"
+            :class="{ 'chat-list__action--active': m.feedback === 'up' }"
+            title="回答有帮助"
+            @click="emitFeedback(m.id, 'up')"
+          >
+            👍
+          </button>
+          <button
+            class="chat-list__action"
+            :class="{ 'chat-list__action--active': m.feedback === 'down' }"
+            title="回答不满意"
+            @click="emitFeedback(m.id, 'down')"
+          >
+            👎
+          </button>
+          <button class="chat-list__action" title="复制全文" @click="copyMessage(m)">复制</button>
+          <button
+            v-if="m === messages[messages.length - 1]"
+            class="chat-list__action"
+            title="重新生成回复"
+            @click="$emit('regenerate')"
+          >
+            重新生成
+          </button>
+        </div>
       </div>
     </div>
     <div ref="scrollAnchor" class="chat-list__anchor" />
@@ -44,6 +72,7 @@
 
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from 'vue';
+import { ElMessage } from 'element-plus';
 import type { ChatMessage } from '../../store/chatStore';
 import ThinkingSteps from './ThinkingSteps.vue';
 import { renderMarkdown } from '../../utils/markdown';
@@ -53,6 +82,11 @@ const props = defineProps<{
   messages: ChatMessage[];
   typing?: boolean;
   streamingContent?: string | null;
+}>();
+
+const emit = defineEmits<{
+  (e: 'feedback', payload: { messageId: string; type: 'up' | 'down' }): void;
+  (e: 'regenerate'): void;
 }>();
 
 const scrollAnchor = ref<HTMLElement | null>(null);
@@ -72,6 +106,21 @@ watch(
   },
   { deep: true },
 );
+
+/** 反馈：交给父组件（调 store.setFeedback + 后端入库） */
+function emitFeedback(messageId: string, type: 'up' | 'down') {
+  emit('feedback', { messageId, type });
+}
+
+/** 复制回复全文 */
+async function copyMessage(m: ChatMessage) {
+  try {
+    await navigator.clipboard.writeText(m.content);
+    ElMessage.success('已复制');
+  } catch {
+    ElMessage.error('复制失败，请手动选择复制');
+  }
+}
 </script>
 
 <style scoped>
@@ -217,6 +266,38 @@ watch(
   margin-left: 1px;
   animation: chat-list-cursor-blink 0.8s step-end infinite;
   vertical-align: text-bottom;
+}
+
+/* AI 回复操作栏 */
+.chat-list__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.chat-list__action {
+  border: 1px solid var(--app-border);
+  background: transparent;
+  color: var(--app-text-secondary);
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.chat-list__action:hover {
+  color: var(--app-accent-blue);
+  border-color: var(--app-accent-blue);
+}
+
+.chat-list__action--active {
+  color: var(--el-color-primary);
+  border-color: var(--el-color-primary);
+  background: rgba(64, 158, 255, 0.1);
 }
 
 @keyframes chat-list-cursor-blink {
