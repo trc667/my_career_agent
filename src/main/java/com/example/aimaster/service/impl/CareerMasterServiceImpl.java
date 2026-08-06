@@ -17,6 +17,7 @@ import com.example.aimaster.memory.ConversationMemoryStore;
 import com.example.aimaster.rag.RagDocumentLoader;
 import com.example.aimaster.service.CareerMasterService;
 import com.example.aimaster.service.FaqService;
+import com.example.aimaster.service.SemanticCache;
 import com.example.aimaster.tool.FileTool;
 import com.example.aimaster.tool.LoggingToolCallback;
 import com.example.aimaster.rag.HybridRetriever;
@@ -28,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -79,6 +81,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
     private final ConversationMemoryStore memoryStore;
     private final ContextCompressor contextCompressor;
     private final FaqService faqService;
+    private final SemanticCache semanticCache;
     private final RagDocumentLoader ragDocumentLoader;
     private final HybridRetriever hybridRetriever;
     private final SyncMcpToolCallbackProvider mcpToolCallbackProvider;
@@ -98,6 +101,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             ConversationMemoryStore memoryStore,
             ContextCompressor contextCompressor,
             FaqService faqService,
+            SemanticCache semanticCache,
             RagDocumentLoader ragDocumentLoader,
             HybridRetriever hybridRetriever,
             @Autowired(required = false) SyncMcpToolCallbackProvider mcpToolCallbackProvider,
@@ -115,6 +119,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         this.memoryStore = memoryStore;
         this.contextCompressor = contextCompressor;
         this.faqService = faqService;
+        this.semanticCache = semanticCache;
         this.ragDocumentLoader = ragDocumentLoader;
         this.hybridRetriever = hybridRetriever;
         this.mcpToolCallbackProvider = mcpToolCallbackProvider;
@@ -263,6 +268,53 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         return faq;
     }
 
+    /**
+     * 多轮历史融合检索：把最近 1-2 轮用户问题并入检索 query，
+     * 解决「那怎么优化呢」「具体怎么做」这类指代性问题单轮检索召不回主题的问题。
+     * 零额外 LLM 调用：直接拼接原文（embedding 编码整句语义，BM25 命中历史主题词）。
+     */
+    private String buildRagQuery(String conversationId, String currentInput) {
+        List<Message> history = memoryStore.getMessages(conversationId);
+        List<String> prevQuestions = new ArrayList<>();
+        for (int i = history.size() - 1; i >= 0 && prevQuestions.size() < 2; i--) {
+            Message m = history.get(i);
+            if (m != null && m.getMessageType() == MessageType.USER) {
+                String t = m.getText();
+                if (t != null && !t.isBlank()) prevQuestions.add(t.trim());
+            }
+        }
+        if (prevQuestions.isEmpty()) {
+            return currentInput;
+        }
+        java.util.Collections.reverse(prevQuestions);
+        // 历史问题截断到 60 字，避免长历史稀释当前问题
+        String historyPart = prevQuestions.stream()
+                .map(p -> p.length() > 60 ? p.substring(0, 60) : p)
+                .collect(Collectors.joining(" "));
+        return historyPart + " " + currentInput;
+    }
+
+    /** 语义缓存：仅对「新会话首轮、无历史上下文」的独立问题生效，避免多轮上下文错配 */
+    private String trySemanticCache(String id, String input, String rawMessage) {
+        if (memoryStore.getMessages(id).isEmpty()) {
+            String cached = semanticCache.get(rawMessage);
+            if (cached != null) {
+                log.info("---------- 语义缓存命中，跳过 RAG+LLM ----------");
+                memoryStore.add(id, new UserMessage(input));
+                memoryStore.add(id, new AssistantMessage(cached));
+            }
+            return cached;
+        }
+        return null;
+    }
+
+    /** 回复完成后写入语义缓存（仅新会话首轮：历史恰好只剩本轮 user+assistant 两条） */
+    private void cacheIfFresh(String id, String rawMessage, String reply) {
+        if (reply != null && !reply.isBlank() && memoryStore.getMessages(id).size() == 2) {
+            semanticCache.put(rawMessage, reply);
+        }
+    }
+
     private String extractReplyText(org.springframework.ai.chat.model.ChatResponse response) {
         if (response == null) return "";
         Generation gen = response.getResult();
@@ -297,7 +349,13 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             return ChatResponse.builder().conversationId(id).usageTokens(0).reply(faq).build();
         }
 
-        String context = retrieveRagContext(input);
+        String cached = trySemanticCache(id, input, userMessage);
+        if (cached != null) {
+            return ChatResponse.builder().conversationId(id).usageTokens(0).reply(cached).build();
+        }
+
+        // 多轮历史融合检索：历史问题并入 query，提升指代性问题召回
+        String context = retrieveRagContext(buildRagQuery(id, input));
         String systemWithContext = systemPrompt.replace("{context}", context != null ? context : "");
         List<Message> msgList = buildPromptMessages(id, systemWithContext, input);
         Prompt prompt = new Prompt(msgList);
@@ -308,6 +366,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
                 : null;
         memoryStore.add(id, new UserMessage(input));
         memoryStore.add(id, new AssistantMessage(reply != null ? reply : ""));
+        cacheIfFresh(id, userMessage, reply);
 
         return ChatResponse.builder().conversationId(id).usageTokens(usage).reply(reply != null ? reply : "").build();
     }
@@ -341,15 +400,28 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         if (faq != null) {
             return new ChatStreamSession(id, Flux.just(faq));
         }
-        String context = retrieveRagContext(input);
+        String cached = trySemanticCache(id, input, userMessage);
+        if (cached != null) {
+            return new ChatStreamSession(id, Flux.just(cached));
+        }
+        // 多轮历史融合检索：历史问题并入 query，提升指代性问题召回
+        String context = retrieveRagContext(buildRagQuery(id, input));
         String systemWithContext = systemPrompt.replace("{context}", context != null ? context : "");
         List<Message> msgList = buildPromptMessages(id, systemWithContext, input);
-        Flux<String> flux = streamingChatModel != null
-                ? streamingChatModel.stream(new Prompt(msgList))
-                        .mapNotNull(r -> r != null && r.getResult() != null && r.getResult().getOutput() != null ? r.getResult().getOutput().getText() : null)
-                        .filter(s -> s != null && !s.isEmpty())
-                        .map(this::filterText)
-                : Flux.just(filterText(extractReplyText(chatModel.call(new Prompt(msgList)))));
+        Flux<String> flux;
+        if (streamingChatModel != null) {
+            StringBuilder replyBuf = new StringBuilder();
+            flux = streamingChatModel.stream(new Prompt(msgList))
+                    .mapNotNull(r -> r != null && r.getResult() != null && r.getResult().getOutput() != null ? r.getResult().getOutput().getText() : null)
+                    .filter(s -> s != null && !s.isEmpty())
+                    .map(this::filterText)
+                    .doOnNext(replyBuf::append)
+                    .doOnComplete(() -> cacheIfFresh(id, userMessage, replyBuf.toString()));
+        } else {
+            String fullReply = filterText(extractReplyText(chatModel.call(new Prompt(msgList))));
+            cacheIfFresh(id, userMessage, fullReply);
+            flux = Flux.just(fullReply);
+        }
         return new ChatStreamSession(id, flux);
     }
 

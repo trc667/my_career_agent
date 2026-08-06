@@ -110,6 +110,10 @@ app:
     enabled: true
     words-file: classpath:sensitive-words.txt
     replacement: "***"
+  # 语义缓存：相同独立问题直接命中缓存答案，跳过 RAG+LLM（仅新会话首轮生效，防多轮上下文错配）
+  semantic-cache:
+    capacity: 200        # 缓存容量上限（超出淘汰最旧）
+    ttl-seconds: 1800    # 有效期 30 分钟，命中滑动刷新
 
 # Resilience4j 限流：每分钟 20 次，超限立即拒绝
 resilience4j:
@@ -124,4 +128,3 @@ resilience4j:
         limitForPeriod: 60
         limitRefreshPeriod: 60s
         timeoutDuration: 0
-
