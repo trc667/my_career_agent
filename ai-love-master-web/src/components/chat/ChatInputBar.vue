@@ -8,9 +8,12 @@
       @keydown.enter.prevent="onEnter"
     />
     <div class="input-bar__actions">
-      <el-button @click="$emit('clear')" :disabled="disabled">清空对话</el-button>
-      <el-button type="primary" :disabled="disabled || !text.trim()" @click="send">
+      <el-button @click="$emit('clear')" :disabled="disabled || typing">清空对话</el-button>
+      <el-button v-if="!typing" type="primary" class="pixel-btn" :disabled="disabled || !text.trim()" @click="send">
         发送
+      </el-button>
+      <el-button v-else type="danger" class="pixel-btn" @click="$emit('stop')">
+        停止生成
       </el-button>
     </div>
   </div>
@@ -22,11 +25,13 @@ import { ref } from 'vue';
 defineProps<{
   disabled?: boolean;
   placeholder?: string;
+  typing?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: 'send', text: string): void;
   (e: 'clear'): void;
+  (e: 'stop'): void;
 }>();
 
 const text = ref('');

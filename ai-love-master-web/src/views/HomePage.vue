@@ -3,9 +3,9 @@
     <!-- 顶部导航 -->
     <header class="home__nav">
       <div class="home__brand">
-        <span class="home__brand-logo">AI</span>
+        <span class="home__brand-logo pixel-font">AI</span>
         <span class="home__brand-name">职规助手</span>
-        <small class="home__brand-sub">career-master</small>
+        <small class="home__brand-sub pixel-font">career-master</small>
       </div>
       <div class="home__nav-right">
         <template v-if="authStore.isAuthenticated()">
@@ -44,15 +44,21 @@
 
       <!-- 快捷入口 -->
       <div class="home__quick">
-        <router-link to="/navigate" class="home__quick-link">🌐 网站导航</router-link>
-        <router-link to="/feedback" class="home__quick-link">💬 意见反馈</router-link>
+        <router-link to="/navigate" class="home__quick-link">
+          <PixelIcon name="globe" :size="18" /> 网站导航
+        </router-link>
+        <router-link to="/feedback" class="home__quick-link">
+          <PixelIcon name="comment" :size="18" /> 意见反馈
+        </router-link>
       </div>
 
       <!-- 状态条：实时时钟 + 倒计时 -->
       <div class="home__statusbar">
-        <span class="home__statusbar-item">🕐 {{ clockText }}</span>
-        <span class="home__statusbar-item">🏖 距周末 {{ weekendText }}</span>
-        <span class="home__statusbar-item">🎉 距{{ holidayName }} {{ holidayText }}</span>
+        <span class="home__statusbar-item">
+          <PixelIcon name="clock" :size="14" /> <span class="pixel-font">{{ clockText }}</span>
+        </span>
+        <span class="home__statusbar-item">🏖 距周末 <span class="pixel-font">{{ weekendText }}</span></span>
+        <span class="home__statusbar-item">🎉 距{{ holidayName }} <span class="pixel-font">{{ holidayText }}</span></span>
       </div>
 
       <!-- 多引擎搜索框 -->
@@ -68,7 +74,7 @@
           clearable
           @keyup.enter="doSearch"
         />
-        <el-button type="primary" size="large" class="home__search-btn" @click="doSearch">
+        <el-button type="primary" size="large" class="home__search-btn pixel-btn" @click="doSearch">
           搜索
         </el-button>
       </div>
@@ -77,14 +83,14 @@
     <!-- 应用卡片：3D 翻转 -->
     <section class="home__apps">
       <div
-        class="app-card"
+        class="app-card pixel-hover"
         @click="goToApp('/career-master')"
         @mousemove="onCardMove($event, $event.currentTarget as HTMLElement)"
         @mouseleave="onCardLeave($event.currentTarget as HTMLElement)"
       >
         <div class="app-card__inner">
           <div class="app-card__face app-card__face--front">
-            <div class="app-card__icon">🎓</div>
+            <div class="app-card__icon"><PixelIcon name="briefcase" :size="52" /></div>
             <h3 class="app-card__name">AI 职规大师</h3>
             <p class="app-card__desc">不懂怎么规划职业？<br />简历、面试、校招随时问</p>
             <span class="app-card__hint">悬停看看能帮你做什么 →</span>
@@ -103,14 +109,14 @@
       </div>
 
       <div
-        class="app-card"
+        class="app-card pixel-hover"
         @click="goToApp('/super-agent')"
         @mousemove="onCardMove($event, $event.currentTarget as HTMLElement)"
         @mouseleave="onCardLeave($event.currentTarget as HTMLElement)"
       >
         <div class="app-card__inner">
           <div class="app-card__face app-card__face--front">
-            <div class="app-card__icon">🤖</div>
+            <div class="app-card__icon"><PixelIcon name="cpu" :size="52" /></div>
             <h3 class="app-card__name">AI 超级智能体</h3>
             <p class="app-card__desc">一个任务，AI 帮你跑完<br />查资料、找地点、出 PDF 一条龙</p>
             <span class="app-card__hint">悬停看看能帮你做什么 →</span>
@@ -129,14 +135,14 @@
       </div>
 
       <div
-        class="app-card"
+        class="app-card pixel-hover"
         @click="goToApp('/bagu')"
         @mousemove="onCardMove($event, $event.currentTarget as HTMLElement)"
         @mouseleave="onCardLeave($event.currentTarget as HTMLElement)"
       >
         <div class="app-card__inner">
           <div class="app-card__face app-card__face--front">
-            <div class="app-card__icon">📚</div>
+            <div class="app-card__icon"><PixelIcon name="book-open" :size="52" /></div>
             <h3 class="app-card__name">AI 八股练习场</h3>
             <p class="app-card__desc">面试八股随便刷<br />按主题速览 + 随机抽题</p>
             <span class="app-card__hint">悬停看看能帮你做什么 →</span>
@@ -153,9 +159,35 @@
           </div>
         </div>
       </div>
+
+      <div
+        class="app-card pixel-hover"
+        @click="goToApp('/resume-review')"
+        @mousemove="onCardMove($event, $event.currentTarget as HTMLElement)"
+        @mouseleave="onCardLeave($event.currentTarget as HTMLElement)"
+      >
+        <div class="app-card__inner">
+          <div class="app-card__face app-card__face--front">
+            <div class="app-card__icon"><PixelIcon name="card-text" :size="52" /></div>
+            <h3 class="app-card__name">AI 简历评分</h3>
+            <p class="app-card__desc">简历行不行？AI 帮你把关<br />分维度打分 + 优化版简历</p>
+            <span class="app-card__hint">悬停看看能帮你做什么 →</span>
+          </div>
+          <div class="app-card__face app-card__face--back">
+            <h3 class="app-card__back-title">AI 简历评分</h3>
+            <ul class="app-card__features">
+              <li>6 大维度量化打分</li>
+              <li>项目经历深度诊断</li>
+              <li>量化成果优化建议</li>
+              <li>一键生成优化版简历</li>
+            </ul>
+            <span class="app-card__go">去评分 →</span>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <!-- 背景装饰：柔和光斑 + 漂浮圆点 -->
+    <!-- 背景装饰：柔和光斑 + 漂浮圆点 + 像素云/星 -->
     <div class="home__bg" aria-hidden="true">
       <span class="app-orb app-orb--blue home__orb home__orb--1" />
       <span class="app-orb app-orb--orange home__orb home__orb--2" />
@@ -166,6 +198,12 @@
         class="home__dot"
         :style="dotStyle(n)"
       />
+      <span class="pixel-cloud home__pixel home__pixel--cloud1" />
+      <span class="pixel-cloud home__pixel home__pixel--cloud2" />
+      <span class="pixel-star home__pixel home__pixel--star1" />
+      <span class="pixel-star home__pixel home__pixel--star2" />
+      <span class="pixel-star home__pixel home__pixel--star3" />
+      <span class="pixel-block home__pixel home__pixel--block1" />
     </div>
 
     <!-- 最新公告弹窗 -->
@@ -185,6 +223,15 @@
         </router-link>
       </template>
     </el-dialog>
+
+    <!-- 页脚 -->
+    <footer class="home__footer">
+      <span>© 2026 AI 职规助手</span>
+      <span class="home__footer-sep">·</span>
+      <router-link to="/agreement" class="home__footer-link">用户协议</router-link>
+      <span class="home__footer-sep">·</span>
+      <router-link to="/agreement" class="home__footer-link">隐私政策</router-link>
+    </footer>
   </div>
 </template>
 
@@ -193,6 +240,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessageBox } from 'element-plus';
 import { ArrowDown } from '@element-plus/icons-vue';
+import PixelIcon from '../components/PixelIcon.vue';
 import { useAuthStore } from '../store/authStore';
 import { getLatestNotice, type Notice } from '../api/notice';
 
@@ -374,7 +422,8 @@ function onCardMove(e: MouseEvent, el: HTMLElement) {
   const rect = el.getBoundingClientRect();
   const px = (e.clientX - rect.left) / rect.width - 0.5;
   const py = (e.clientY - rect.top) / rect.height - 0.5;
-  el.style.transform = `perspective(1200px) rotateY(${(px * 8).toFixed(2)}deg) rotateX(${(-py * 8).toFixed(2)}deg)`;
+  // 3D 倾斜 + 像素风 hover 微位移（translate 与内联 transform 合并，避免被覆盖）
+  el.style.transform = `perspective(1200px) translate(-2px, -2px) rotateY(${(px * 8).toFixed(2)}deg) rotateX(${(-py * 8).toFixed(2)}deg)`;
 }
 
 function onCardLeave(el: HTMLElement) {
@@ -900,6 +949,144 @@ function dotStyle(n: number) {
   line-height: 1.8;
   white-space: pre-wrap;
   color: var(--app-text-secondary);
+}
+
+/* ===== 页脚 ===== */
+.home__footer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--app-space-sm);
+  padding: var(--app-space-lg) 0 var(--app-space-xl);
+  font-size: 13px;
+  color: var(--app-text-secondary);
+}
+
+.home__footer-sep {
+  opacity: 0.6;
+}
+
+.home__footer-link {
+  color: var(--app-text-secondary);
+  text-decoration: none;
+}
+
+.home__footer-link:hover {
+  color: var(--app-accent-blue);
+  text-decoration: underline;
+}
+
+/* ===== 像素风点缀 ===== */
+/* 品牌 logo：像素方块 + 硬阴影 */
+.home__brand-logo {
+  border-radius: 4px;
+  box-shadow: 3px 3px 0 rgba(64, 158, 255, 0.6);
+  letter-spacing: 0;
+}
+
+/* 背景像素装饰定位 */
+.home__pixel {
+  z-index: 1;
+}
+
+.home__pixel--cloud1 {
+  top: 14%;
+  left: 6%;
+  opacity: 0.35;
+}
+
+.home__pixel--cloud2 {
+  top: 20%;
+  right: 8%;
+  opacity: 0.3;
+  animation-delay: 2.5s;
+  transform: scale(0.8);
+}
+
+.home__pixel--star1 {
+  top: 12%;
+  right: 24%;
+}
+
+.home__pixel--star2 {
+  top: 34%;
+  left: 14%;
+  animation-delay: 1.6s;
+  transform: scale(0.7);
+}
+
+.home__pixel--star3 {
+  bottom: 18%;
+  right: 16%;
+  animation-delay: 3s;
+}
+
+.home__pixel--block1 {
+  top: 48%;
+  right: 5%;
+  transform: scale(0.9);
+}
+
+/* 像素图标不再需要柔光阴影 */
+.app-card__icon {
+  filter: none;
+  color: var(--app-accent-blue);
+}
+
+.app-card__icon :deep(.pixel-icon) {
+  color: var(--app-accent-blue);
+}
+
+/* 卡片背面跳转按钮：像素化 */
+.app-card__go {
+  border-radius: 3px;
+  box-shadow: 0 4px 0 rgb(214, 124, 44);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.app-card:hover .app-card__go {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 0 rgb(214, 124, 44);
+}
+
+.app-card:active .app-card__go {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 rgb(214, 124, 44);
+}
+
+/* 修复：卡片悬停像素描边（边框在 face 上，非外层容器） */
+.app-card:hover .app-card__face--front {
+  border-color: var(--el-color-primary);
+}
+
+/* 修复：卡片悬停位移——覆盖入场动画 fill-mode 的优先级 */
+.app-card:hover {
+  animation: none;
+}
+
+/* 修复：快捷入口像素化（原来是胶囊圆角） */
+.home__quick-link {
+  border-radius: 3px;
+  border: 2px solid var(--app-border);
+  box-shadow: 0 3px 0 var(--app-border);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, color 0.2s ease;
+}
+
+.home__quick-link:hover {
+  color: var(--app-accent-blue);
+  border-color: var(--app-accent-blue);
+  box-shadow: 0 5px 0 var(--app-border);
+  transform: translateY(-1px);
+}
+
+.home__quick-link:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--app-border);
 }
 
 @media (max-width: 767px) {

@@ -2,7 +2,7 @@
   <div class="sidebar">
     <div class="sidebar__top">
       <div class="sidebar__brand">功能</div>
-      <el-button size="small" type="primary" plain @click="$emit('new-conversation')">
+      <el-button size="small" type="primary" plain class="pixel-btn" @click="$emit('new-conversation')">
         新对话
       </el-button>
     </div>
@@ -10,10 +10,18 @@
     <div v-if="showMcp" class="sidebar__section">
       <div class="sidebar__section-title">快捷入口</div>
       <el-menu class="sidebar__menu" :default-active="'talk'">
-        <el-menu-item index="talk" @click="$emit('open-interview-talk')">面试话术</el-menu-item>
-        <el-menu-item index="path" @click="$emit('open-career-path')">学习路线</el-menu-item>
-        <el-menu-item index="gap" @click="$emit('open-skill-gap')">技能差距</el-menu-item>
-        <el-menu-item index="plan" @click="$emit('open-exam-plan')">备考计划</el-menu-item>
+        <el-menu-item index="talk" @click="$emit('open-interview-talk')">
+          <PixelIcon name="message" :size="16" /> 面试话术
+        </el-menu-item>
+        <el-menu-item index="path" @click="$emit('open-career-path')">
+          <PixelIcon name="note" :size="16" /> 学习路线
+        </el-menu-item>
+        <el-menu-item index="gap" @click="$emit('open-skill-gap')">
+          <PixelIcon name="chart" :size="16" /> 技能差距
+        </el-menu-item>
+        <el-menu-item index="plan" @click="$emit('open-exam-plan')">
+          <PixelIcon name="clock" :size="16" /> 备考计划
+        </el-menu-item>
       </el-menu>
     </div>
 
@@ -23,7 +31,7 @@
         <div
           v-for="c in conversations"
           :key="c.id"
-          class="sidebar__history-item"
+          class="sidebar__history-item pixel-hover"
           :class="{ 'sidebar__history-item--active': c.id === currentConversationId }"
           @click="$emit('switch-conversation', c.id)"
         >
@@ -46,6 +54,8 @@
 </template>
 
 <script setup lang="ts">
+import PixelIcon from '../PixelIcon.vue';
+
 export interface SidebarConversation {
   id: string;
   title: string;
@@ -98,6 +108,13 @@ defineEmits<{
 
 .sidebar__menu {
   border-right: 0;
+}
+
+.sidebar__menu :deep(.el-menu-item) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
 }
 
 .sidebar__history {

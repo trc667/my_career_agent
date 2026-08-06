@@ -16,10 +16,10 @@
   --app-space-xl: 24px;
   --app-space-2xl: 40px;
 
-  /* 圆角（大圆角卡片，参考现代导航站风格） */
-  --app-radius-sm: 8px;
-  --app-radius-md: 12px;
-  --app-radius-lg: 20px;
+  /* 圆角（中等圆角，配合像素风降低"AI 味"大圆角） */
+  --app-radius-sm: 6px;
+  --app-radius-md: 10px;
+  --app-radius-lg: 14px;
 
   /* 响应式断点（配合媒体查询使用） */
   --app-sidebar-width: 280px;
@@ -69,6 +69,13 @@ body {
   overflow-x: hidden;
 }
 
+/* 键盘焦点可见（无障碍）：焦点时显示像素风格高亮 */
+:focus-visible {
+  outline: 2px solid var(--el-color-primary, #409eff);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -93,7 +100,7 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* 背景装饰：柔和光斑（首页/登录页） */
+/* 背景装饰：柔和光斑（保留但降低透明度，配合像素装饰使用，弱化 AI 味） */
 .app-orb {
   position: absolute;
   border-radius: 50%;
@@ -103,15 +110,15 @@ body {
 }
 
 .app-orb--blue {
-  background: rgba(64, 158, 255, 0.22);
+  background: rgba(64, 158, 255, 0.14);
 }
 
 .app-orb--orange {
-  background: rgba(230, 162, 60, 0.2);
+  background: rgba(230, 162, 60, 0.13);
 }
 
 .app-orb--purple {
-  background: rgba(114, 100, 240, 0.18);
+  background: rgba(114, 100, 240, 0.12);
 }
 
 /* ===== 页面切换过渡（路由跳转） ===== */

@@ -33,8 +33,8 @@
               typing &&
               m === messages[messages.length - 1]
             "
-            class="chat-list__cursor"
-          >|</span>
+            class="pixel-caret"
+          />
         </div>
       </div>
     </div>
