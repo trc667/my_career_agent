@@ -69,7 +69,14 @@ app:
   # 多轮对话记忆（MySQL 落库，跨设备可回看；file 为旧文件存储兼容）
   memory:
     type: db
-    max-messages-per-conversation: 20
+    # 单次取回用于 LLM 上下文裁度的最近消息条数上限（含压缩素材，全量仍落库）
+    max-messages-per-conversation: 50
+    # token 预算：纳入 LLM 上下文的历史消息总 token 上限（超出的早期消息被压缩/丢弃）
+    history-token-budget: 4000
+    # 早期对话 LLM 摘要压缩：true=超预算时生成摘要占位（按会话缓存复用），false=直接丢弃
+    enable-summary: true
+    # 摘要最大字符数（控制摘要本身占用的 token）
+    summary-max-chars: 800
     file:
       base-dir: ./data/chat-memory
   # RAG 文档切割（优化后：250 token/块减少发散，60 字下限防过碎）

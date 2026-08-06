@@ -9,6 +9,7 @@ import com.example.aimaster.entity.ConversationMessage;
 import com.example.aimaster.entity.User;
 import com.example.aimaster.mapper.ConversationMapper;
 import com.example.aimaster.mapper.ConversationMessageMapper;
+import com.example.aimaster.memory.ContextCompressor;
 import com.example.aimaster.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
@@ -42,13 +43,16 @@ public class ConversationController {
     private final AuthService authService;
     private final ConversationMapper conversationMapper;
     private final ConversationMessageMapper messageMapper;
+    private final ContextCompressor contextCompressor;
 
     public ConversationController(AuthService authService,
                                   ConversationMapper conversationMapper,
-                                  ConversationMessageMapper messageMapper) {
+                                  ConversationMessageMapper messageMapper,
+                                  ContextCompressor contextCompressor) {
         this.authService = authService;
         this.conversationMapper = conversationMapper;
         this.messageMapper = messageMapper;
+        this.contextCompressor = contextCompressor;
     }
 
     /** 从 JWT 上下文解析当前用户名 */
@@ -116,6 +120,7 @@ public class ConversationController {
         conversationMapper.deleteById(conv.getId());
         messageMapper.delete(new LambdaQueryWrapper<ConversationMessage>()
                 .eq(ConversationMessage::getConversationId, conversationId));
+        contextCompressor.evict(conversationId);
         return Result.ok("删除成功", null);
     }
 

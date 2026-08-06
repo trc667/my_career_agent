@@ -12,9 +12,11 @@ import com.example.aimaster.dto.ChatStreamSession;
 import com.example.aimaster.dto.CareerReport;
 import com.example.aimaster.dto.ReActStep;
 import com.example.aimaster.filter.SensitiveWordFilter;
+import com.example.aimaster.memory.ContextCompressor;
 import com.example.aimaster.memory.ConversationMemoryStore;
 import com.example.aimaster.rag.RagDocumentLoader;
 import com.example.aimaster.service.CareerMasterService;
+import com.example.aimaster.service.FaqService;
 import com.example.aimaster.tool.FileTool;
 import com.example.aimaster.tool.LoggingToolCallback;
 import com.example.aimaster.rag.HybridRetriever;
@@ -75,6 +77,8 @@ public class CareerMasterServiceImpl implements CareerMasterService {
     private final StreamingChatModel streamingChatModel;
     private final String systemPrompt;
     private final ConversationMemoryStore memoryStore;
+    private final ContextCompressor contextCompressor;
+    private final FaqService faqService;
     private final RagDocumentLoader ragDocumentLoader;
     private final HybridRetriever hybridRetriever;
     private final SyncMcpToolCallbackProvider mcpToolCallbackProvider;
@@ -92,6 +96,8 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             @Autowired(required = false) StreamingChatModel streamingChatModel,
             @Qualifier("careerMasterSystemPrompt") String systemPrompt,
             ConversationMemoryStore memoryStore,
+            ContextCompressor contextCompressor,
+            FaqService faqService,
             RagDocumentLoader ragDocumentLoader,
             HybridRetriever hybridRetriever,
             @Autowired(required = false) SyncMcpToolCallbackProvider mcpToolCallbackProvider,
@@ -107,6 +113,8 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         this.streamingChatModel = streamingChatModel;
         this.systemPrompt = systemPrompt;
         this.memoryStore = memoryStore;
+        this.contextCompressor = contextCompressor;
+        this.faqService = faqService;
         this.ragDocumentLoader = ragDocumentLoader;
         this.hybridRetriever = hybridRetriever;
         this.mcpToolCallbackProvider = mcpToolCallbackProvider;
@@ -141,6 +149,23 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             return SENSITIVE_WORD_HINT;
         }
         return null;
+    }
+
+    /**
+     * 统一组装 LLM 消息列表：系统提示 + 历史（token 预算裁剪 + 早期摘要压缩） + 当前问题。
+     * 超预算的早期消息先尝试摘要占位，压缩失败时降级直接丢弃，不影响主链路。
+     */
+    private List<Message> buildPromptMessages(String conversationId, String systemMessage, String input) {
+        List<Message> history = memoryStore.getMessages(conversationId);
+        ContextCompressor.PreparedHistory prepared = contextCompressor.prepare(conversationId, history);
+        List<Message> msgList = new ArrayList<>();
+        msgList.add(new SystemMessage(systemMessage));
+        if (prepared.summary() != null && !prepared.summary().isBlank()) {
+            msgList.add(new SystemMessage("【更早对话摘要（供参考，保留关键上下文）】\n" + prepared.summary()));
+        }
+        msgList.addAll(prepared.keptMessages());
+        msgList.add(new UserMessage(input));
+        return msgList;
     }
 
     @PostConstruct
@@ -200,11 +225,12 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             return ChatResponse.builder().conversationId(id).reply(hint).build();
         }
 
-        List<Message> history = memoryStore.getMessages(id);
-        List<Message> msglist = new ArrayList<>();
-        msglist.add(new SystemMessage(systemPrompt.replace("{context}", "")));
-        msglist.addAll(history);
-        msglist.add(new UserMessage(input));
+        String faq = tryFaq(id, input, userMessage);
+        if (faq != null) {
+            return ChatResponse.builder().conversationId(id).usageTokens(0).reply(faq).build();
+        }
+
+        List<Message> msglist = buildPromptMessages(id, systemPrompt.replace("{context}", ""), input);
 
         Prompt prompt = new Prompt(msglist);
         org.springframework.ai.chat.model.ChatResponse response = chatModel.call(prompt);
@@ -220,6 +246,21 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         return ChatResponse.builder()
                 .conversationId(id).usageTokens(usage).reply(reply != null ? reply : "")
                 .build();
+    }
+
+    /**
+     * FAQ 拦截：命中返回标准答案并写入会话历史，跳过 RAG 检索与 LLM 调用（省 token、响应快）。
+     *
+     * @return 命中返回答案，未命中返回 null
+     */
+    private String tryFaq(String id, String input, String rawMessage) {
+        String faq = faqService.match(rawMessage);
+        if (faq != null) {
+            log.info("---------- FAQ 精确匹配命中，跳过 RAG+LLM ----------");
+            memoryStore.add(id, new UserMessage(input));
+            memoryStore.add(id, new AssistantMessage(faq));
+        }
+        return faq;
     }
 
     private String extractReplyText(org.springframework.ai.chat.model.ChatResponse response) {
@@ -251,12 +292,14 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             return ChatResponse.builder().conversationId(id).reply(hint).build();
         }
 
+        String faq = tryFaq(id, input, userMessage);
+        if (faq != null) {
+            return ChatResponse.builder().conversationId(id).usageTokens(0).reply(faq).build();
+        }
+
         String context = retrieveRagContext(input);
         String systemWithContext = systemPrompt.replace("{context}", context != null ? context : "");
-        List<Message> msgList = new ArrayList<>();
-        msgList.add(new SystemMessage(systemWithContext));
-        msgList.addAll(memoryStore.getMessages(id));
-        msgList.add(new UserMessage(input));
+        List<Message> msgList = buildPromptMessages(id, systemWithContext, input);
         Prompt prompt = new Prompt(msgList);
         org.springframework.ai.chat.model.ChatResponse call = chatModel.call(prompt);
         String reply = filterText(extractReplyText(call));
@@ -294,12 +337,13 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         if (hint != null) {
             return new ChatStreamSession(id, Flux.just(hint));
         }
+        String faq = tryFaq(id, input, userMessage);
+        if (faq != null) {
+            return new ChatStreamSession(id, Flux.just(faq));
+        }
         String context = retrieveRagContext(input);
         String systemWithContext = systemPrompt.replace("{context}", context != null ? context : "");
-        List<Message> msgList = new ArrayList<>();
-        msgList.add(new SystemMessage(systemWithContext));
-        msgList.addAll(memoryStore.getMessages(id));
-        msgList.add(new UserMessage(input));
+        List<Message> msgList = buildPromptMessages(id, systemWithContext, input);
         Flux<String> flux = streamingChatModel != null
                 ? streamingChatModel.stream(new Prompt(msgList))
                         .mapNotNull(r -> r != null && r.getResult() != null && r.getResult().getOutput() != null ? r.getResult().getOutput().getText() : null)
@@ -459,10 +503,12 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             memoryStore.add(id, new AssistantMessage(msg));
             return ChatResponse.builder().conversationId(id).reply(msg).steps(List.of()).build();
         }
-        List<Message> msgList = new ArrayList<>();
-        msgList.add(new SystemMessage(systemPrompt.replace("{context}", "") + "\n\n" + AMAP_TOOL_GUIDELINES));
-        msgList.addAll(memoryStore.getMessages(id));
-        msgList.add(new UserMessage(input));
+        String faq = tryFaq(id, input, userMessage);
+        if (faq != null) {
+            return ChatResponse.builder().conversationId(id).reply(faq).steps(List.of()).build();
+        }
+        List<Message> msgList = buildPromptMessages(id,
+                systemPrompt.replace("{context}", "") + "\n\n" + AMAP_TOOL_GUIDELINES, input);
         ChatOptions toolOptions = buildToolCallOptionsForReAct();
         if (toolOptions == null) {
             org.springframework.ai.chat.model.ChatResponse resp = callModelWithTimeout(new Prompt(msgList));
@@ -518,6 +564,11 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             sendReplyInChunks(hint, stepConsumer);
             return;
         }
+        String faq = tryFaq(id, input, userMessage);
+        if (faq != null) {
+            sendReplyInChunks(faq, stepConsumer);
+            return;
+        }
         if (maxSteps <= 0) {
             String reply = "maxSteps 必须大于 0。";
             memoryStore.add(id, new UserMessage(input));
@@ -525,10 +576,8 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             sendReplyInChunks(reply, stepConsumer);
             return;
         }
-        List<Message> messages = new ArrayList<>();
-        messages.add(new SystemMessage(systemPrompt.replace("{context}", "") + "\n\n" + AMAP_TOOL_GUIDELINES));
-        messages.addAll(memoryStore.getMessages(id));
-        messages.add(new UserMessage(input));
+        List<Message> messages = buildPromptMessages(id,
+                systemPrompt.replace("{context}", "") + "\n\n" + AMAP_TOOL_GUIDELINES, input);
         ChatOptions toolOptions = null;
         if (reactStreamToolsEnabled) {
             try {
