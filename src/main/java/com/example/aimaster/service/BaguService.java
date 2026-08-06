@@ -37,7 +37,7 @@ public class BaguService {
     public record BaguPage(List<BaguEntry> list, long total) {
     }
 
-    private final List<BaguEntry> entries = new ArrayList<>();
+    private volatile List<BaguEntry> entries = new ArrayList<>();
     private final Random random = new Random();
 
     public BaguService() {
@@ -49,15 +49,22 @@ public class BaguService {
         try {
             String content = new ClassPathResource("rag/career-tips.txt")
                     .getContentAsString(StandardCharsets.UTF_8);
-            for (String part : content.split("\\n\\s*\\n")) {
-                String s = part.trim();
-                if (s.isEmpty() || s.startsWith("#")) continue;
-                entries.add(new BaguEntry(hashId(s), s, RagDocumentLoader.autoTag(s)));
-            }
-            log.info("八股知识库加载完成：{} 段", entries.size());
+            reload(RagDocumentLoader.splitParagraphs(content));
         } catch (Exception e) {
             log.error("八股知识库加载失败：{}", e.getMessage());
         }
+    }
+
+    /** 重建八股内存缓存（知识库管理入口变更后调用）：以启用知识段列表替换旧缓存 */
+    public void reload(List<String> paragraphs) {
+        if (paragraphs == null) return;
+        List<BaguEntry> rebuilt = new ArrayList<>(paragraphs.size());
+        for (String s : paragraphs) {
+            if (s == null || s.isBlank()) continue;
+            rebuilt.add(new BaguEntry(hashId(s), s, RagDocumentLoader.autoTag(s)));
+        }
+        entries = rebuilt;
+        log.info("八股知识库重建完成：{} 段", entries.size());
     }
 
     /** 分类 + 关键词过滤 + 分页 */

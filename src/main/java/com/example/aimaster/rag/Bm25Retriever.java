@@ -43,9 +43,9 @@ public class Bm25Retriever {
     private static final String FIELD_CONTENT = "content";
     private static final String FIELD_ID = "id";
 
-    private final IndexSearcher searcher;
+    private volatile IndexSearcher searcher;
     private final Analyzer analyzer;
-    private final int docCount;
+    private volatile int docCount;
 
     /**
      * 默认分词器：IK(ik_smart) 词语分词（经 327 QA 实测：Hybrid R@5 89.6%→91.7%、MRR 0.747→0.754）。
@@ -55,6 +55,12 @@ public class Bm25Retriever {
         this(resource, new IKAnalyzer(true));
     }
 
+    /** 直接以知识段列表构建索引（知识库管理入口重建时用，替代读文件） */
+    public Bm25Retriever(List<String> paragraphs) {
+        this.analyzer = new IKAnalyzer(true);
+        rebuild(paragraphs);
+    }
+
     /**
      * 可注入自定义中文分词器（CJK bigram / SmartChinese / IK 等），用于分词对比实验。
      * 索引与检索共用同一 Analyzer，保证语义一致。
@@ -62,12 +68,24 @@ public class Bm25Retriever {
     public Bm25Retriever(Resource resource, Analyzer analyzer) {
         this.analyzer = analyzer;
         try {
+            String content = resource.getContentAsString(StandardCharsets.UTF_8);
+            rebuild(splitParagraphs(content));
+        } catch (Exception e) {
+            throw new IllegalStateException("BM25 索引构建失败：" + e.getMessage(), e);
+        }
+    }
+
+    /** 重建索引（知识库变更后由管理入口调用）：以新段落列表构建内存索引并原子替换 */
+    public synchronized void rebuild(List<String> paragraphs) {
+        if (paragraphs == null || paragraphs.isEmpty()) {
+            log.warn("BM25 重建跳过：知识库为空（保持旧索引不变）");
+            return;
+        }
+        try {
             Directory dir = new ByteBuffersDirectory();
             IndexWriterConfig config = new IndexWriterConfig(analyzer);
             config.setSimilarity(new BM25Similarity());
             try (IndexWriter writer = new IndexWriter(dir, config)) {
-                String content = resource.getContentAsString(StandardCharsets.UTF_8);
-                List<String> paragraphs = splitParagraphs(content);
                 int id = 0;
                 for (String p : paragraphs) {
                     org.apache.lucene.document.Document doc = new org.apache.lucene.document.Document();
@@ -76,12 +94,13 @@ public class Bm25Retriever {
                     writer.addDocument(doc);
                 }
                 docCount = paragraphs.size();
-                log.info("BM25 索引构建完成：{} 段", docCount);
+                log.info("BM25 索引重建完成：{} 段", docCount);
             }
-            searcher = new IndexSearcher(DirectoryReader.open(dir));
-            searcher.setSimilarity(new BM25Similarity());
+            IndexSearcher newSearcher = new IndexSearcher(DirectoryReader.open(dir));
+            newSearcher.setSimilarity(new BM25Similarity());
+            searcher = newSearcher;
         } catch (Exception e) {
-            throw new IllegalStateException("BM25 索引构建失败：" + e.getMessage(), e);
+            log.warn("BM25 索引重建失败：{}（保持旧索引）", e.getMessage());
         }
     }
 

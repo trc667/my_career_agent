@@ -1,11 +1,10 @@
 package com.example.aimaster.rag;
 
+import com.example.aimaster.service.KnowledgeService;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -16,15 +15,16 @@ import org.springframework.stereotype.Component;
 @Order(998)
 public class RagInitRunner implements ApplicationRunner {
 
-    private final RagDocumentLoader ragDocumentLoader;
+    private final KnowledgeService knowledgeService;
 
-    public RagInitRunner(RagDocumentLoader ragDocumentLoader) {
-        this.ragDocumentLoader = ragDocumentLoader;
+    public RagInitRunner(KnowledgeService knowledgeService) {
+        this.knowledgeService = knowledgeService;
     }
 
     @Override
     public void run(ApplicationArguments args) {
-        Resource resource = new ClassPathResource("rag/career-tips.txt");
-        ragDocumentLoader.loadAndIndex(resource);
+        // 知识库统一走 DB 事实源：首次从 career-tips.txt 导入，随后基于启用知识段重建
+        // pgvector 向量库 + BM25 + 八股内存缓存（原 loadAndIndex 直接读文件已废弃）
+        knowledgeService.ensureInitialized();
     }
 }

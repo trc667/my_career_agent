@@ -149,3 +149,15 @@ CREATE TABLE IF NOT EXISTS chat_feedback (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_fb_user_msg (user_id, message_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 知识库管理表：RAG 检索/八股练习/超级智能体的统一事实源（首次启动从 career-tips.txt 导入）
+CREATE TABLE IF NOT EXISTS knowledge (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    category VARCHAR(32) DEFAULT '综合',
+    content TEXT NOT NULL,
+    enabled TINYINT DEFAULT 1 COMMENT '1=启用参与检索,0=停用',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_knowledge_category (category),
+    KEY idx_knowledge_enabled (enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

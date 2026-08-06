@@ -47,7 +47,7 @@ public class HybridRetriever {
     @Value("${app.rag.hybrid.rerank-top-n:10}")
     private int rerankTopN;
 
-    private Bm25Retriever bm25;
+    private volatile Bm25Retriever bm25;
 
     public HybridRetriever(VectorStore vectorStore, Reranker reranker) {
         this.vectorStore = vectorStore;
@@ -58,6 +58,16 @@ public class HybridRetriever {
     @PostConstruct
     public void init() {
         bm25 = new Bm25Retriever(new ClassPathResource("rag/career-tips.txt"));
+    }
+
+    /** 知识库变更后重建 BM25 索引（由 KnowledgeService 全量重建时调用，原子替换引用） */
+    public void rebuildBm25(List<String> paragraphs) {
+        if (paragraphs == null || paragraphs.isEmpty()) {
+            log.warn("BM25 重建跳过：知识库为空（保持旧索引不变）");
+            return;
+        }
+        Bm25Retriever rebuilt = new Bm25Retriever(paragraphs);
+        bm25 = rebuilt;
     }
 
     /**

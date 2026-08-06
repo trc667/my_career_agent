@@ -86,3 +86,63 @@ export function getAdminErrorLogs(params?: { source?: string; level?: string; li
 export function clearAdminErrorLogs() {
   return http.delete<any, ResultWrapper<null>>('/api/admin/error-logs');
 }
+
+/* 知识库管理（RAG 事实源在线增删改查） */
+export interface Knowledge {
+  id: number;
+  category: string;
+  content: string;
+  enabled: number;
+  createTime?: string;
+  updateTime?: string;
+}
+
+export interface KnowledgePage {
+  list: Knowledge[];
+  total: number;
+}
+
+export interface KnowledgeCategoryStat {
+  category: string;
+  count: number;
+}
+
+export function getAdminKnowledge(params?: {
+  category?: string;
+  keyword?: string;
+  enabled?: number;
+  page?: number;
+  size?: number;
+}) {
+  return http.get<any, ResultWrapper<KnowledgePage>>('/api/admin/knowledge', { params });
+}
+
+export function getKnowledgeCategories() {
+  return http.get<any, ResultWrapper<KnowledgeCategoryStat[]>>('/api/admin/knowledge/categories');
+}
+
+export function createKnowledge(payload: { content: string; category?: string; enabled?: boolean }) {
+  return http.post<any, ResultWrapper<Knowledge>>('/api/admin/knowledge', payload);
+}
+
+export function updateKnowledge(id: number, payload: { content: string; category?: string; enabled?: boolean }) {
+  return http.put<any, ResultWrapper<Knowledge>>(`/api/admin/knowledge/${id}`, payload);
+}
+
+export function toggleKnowledge(id: number, enabled: boolean) {
+  return http.put<any, ResultWrapper<null>>(`/api/admin/knowledge/${id}/enabled?enabled=${enabled}`);
+}
+
+export function deleteKnowledge(id: number) {
+  return http.delete<any, ResultWrapper<null>>(`/api/admin/knowledge/${id}`);
+}
+
+export function rebuildKnowledge() {
+  return http.post<any, ResultWrapper<null>>('/api/admin/knowledge/rebuild');
+}
+
+export function getKnowledgeRebuildStatus() {
+  return http.get<any, ResultWrapper<{ rebuilding: boolean; status: string; info: string }>>(
+    '/api/admin/knowledge/rebuild-status',
+  );
+}

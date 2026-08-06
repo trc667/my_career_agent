@@ -41,14 +41,9 @@ public class RagDocumentLoader {
     /**
      * 从资源加载文本，分块后写入向量库。
      *
-     * @param resource 例如 new ClassPathResource("rag/love-tips.txt")
+     * @param resource 例如 new ClassPathResource("rag/career-tips.txt")
      */
     public void loadAndIndex(Resource resource) {
-        // 入库前清空旧数据：防止知识库内容变更/扩充后旧向量残留，
-        // 导致检索新旧混杂、重复堆积、topK 被重复内容挤占。
-        // TRUNCATE 比 DELETE 快且会重置序列；表由 PgVectorStore 的 initializeSchema(true) 自动创建。
-        jdbcTemplate.execute("TRUNCATE TABLE vector_store");
-
         String contentAsString;
         try {
             contentAsString = resource.getContentAsString(StandardCharsets.UTF_8);
@@ -56,16 +51,36 @@ public class RagDocumentLoader {
             log.warn("资源读取异常：{}", e.getMessage());
             return;
         }
-        // 按双换行拆成多段
-        String[] parts = contentAsString.split("\\n\\s*\\n");
-        List<String>paragraphs=new ArrayList<>();
-        for (int i = 0; i < parts.length; i++) {
-            String s=parts[i].trim();
-            if (s.isEmpty())continue;
-            if (s.startsWith("#")) continue;
+        // 按双换行拆成多段，过滤空段与 # 注释
+        List<String> paragraphs = splitParagraphs(contentAsString);
+        reloadFromParagraphs(paragraphs);
+    }
+
+    /** 与 Bm25Retriever/BaguService 相同的分段逻辑：按双换行切分，过滤空段与 # 注释 */
+    public static List<String> splitParagraphs(String content) {
+        String[] parts = content.split("\\n\\s*\\n");
+        List<String> paragraphs = new ArrayList<>();
+        for (String part : parts) {
+            String s = part.trim();
+            if (s.isEmpty() || s.startsWith("#")) continue;
             paragraphs.add(s);
         }
-        // 2. 将每段文本转成 Document（含自动标签）
+        return paragraphs;
+    }
+
+    /**
+     * 从知识段列表重建向量索引（管理后台增删改后调用）：先 TRUNCATE 旧向量，再全量入库。
+     * 入库前清空旧数据防止新旧混杂/重复堆积/topK 被重复内容挤占；TRUNCATE 比 DELETE 快且重置序列。
+     */
+    public void reloadFromParagraphs(List<String> paragraphs) {
+        if (paragraphs == null || paragraphs.isEmpty()) {
+            log.warn("知识库为空，跳过向量重建（保持旧索引不变）");
+            return;
+        }
+        // 入库前清空旧数据：防止知识库内容变更/扩充后旧向量残留
+        jdbcTemplate.execute("TRUNCATE TABLE vector_store");
+
+        // 将每段文本转成 Document（含自动标签）
         List<Document> documents = new ArrayList<>();
         for (String paragraph : paragraphs) {
             // 长段落按句号二次切分，减少"一坨长文本"匹配不准的问题
@@ -89,7 +104,7 @@ public class RagDocumentLoader {
             List<Document> batch = documents.subList(i, Math.min(i + batchSize, documents.size()));
             vectorStore.add(batch);
         }
-        log.info("RAG 入库完成，共 {} 条", documents.size());
+        log.info("RAG 向量重建完成，共 {} 条", documents.size());
     }
 
     /** 按句号把超过 maxLen 字符的段落切分成多段（保留完整句子，不截断） */

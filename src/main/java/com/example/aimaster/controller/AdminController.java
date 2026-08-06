@@ -2,6 +2,7 @@ package com.example.aimaster.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.aimaster.dto.AnnouncementRequest;
+import com.example.aimaster.dto.KnowledgeRequest;
 import com.example.aimaster.dto.Result;
 import com.example.aimaster.entity.Announcement;
 import com.example.aimaster.entity.Feedback;
@@ -12,6 +13,7 @@ import com.example.aimaster.mapper.FeedbackMapper;
 import com.example.aimaster.mapper.UserMapper;
 import com.example.aimaster.service.OssStorageService;
 import com.example.aimaster.service.ErrorLogService;
+import com.example.aimaster.service.KnowledgeService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 管理后台接口：公告管理、意见反馈查看、用户列表。
+ * 管理后台接口：公告管理、意见反馈查看、用户列表、知识库管理。
  * 全部要求 ROLE_ADMIN（由 SecurityConfig 统一拦截）。
  */
 @RestController
@@ -42,17 +44,20 @@ public class AdminController {
     private final UserMapper userMapper;
     private final OssStorageService ossStorageService;
     private final ErrorLogService errorLogService;
+    private final KnowledgeService knowledgeService;
 
     public AdminController(AnnouncementMapper announcementMapper,
                            FeedbackMapper feedbackMapper,
                            UserMapper userMapper,
                            OssStorageService ossStorageService,
-                           ErrorLogService errorLogService) {
+                           ErrorLogService errorLogService,
+                           KnowledgeService knowledgeService) {
         this.announcementMapper = announcementMapper;
         this.feedbackMapper = feedbackMapper;
         this.userMapper = userMapper;
         this.ossStorageService = ossStorageService;
         this.errorLogService = errorLogService;
+        this.knowledgeService = knowledgeService;
     }
 
     /* ===== 公告管理 ===== */
@@ -154,5 +159,65 @@ public class AdminController {
     public Result<Void> clearErrorLogs() {
         errorLogService.clear();
         return Result.ok("已清空", null);
+    }
+
+    /* ===== 知识库管理（RAG 事实源在线增删改查，变更后异步重建索引） ===== */
+
+    /** GET /api/admin/knowledge 分页查询（分类/关键词/启用状态过滤） */
+    @GetMapping("/knowledge")
+    public Result<KnowledgeService.KnowledgePage> knowledge(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer enabled,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return Result.ok(knowledgeService.list(category, keyword, enabled, page, Math.min(Math.max(size, 1), 100)));
+    }
+
+    /** GET /api/admin/knowledge/categories 分类统计 */
+    @GetMapping("/knowledge/categories")
+    public Result<List<Map<String, Object>>> knowledgeCategories() {
+        return Result.ok(knowledgeService.categories());
+    }
+
+    /** POST /api/admin/knowledge 新增知识段 */
+    @PostMapping("/knowledge")
+    public Result<com.example.aimaster.entity.Knowledge> createKnowledge(@Valid @RequestBody KnowledgeRequest req) {
+        return Result.ok(knowledgeService.create(req));
+    }
+
+    /** PUT /api/admin/knowledge/{id} 更新知识段 */
+    @PutMapping("/knowledge/{id}")
+    public Result<com.example.aimaster.entity.Knowledge> updateKnowledge(@PathVariable Long id,
+                                                                        @Valid @RequestBody KnowledgeRequest req) {
+        return Result.ok(knowledgeService.update(id, req));
+    }
+
+    /** PUT /api/admin/knowledge/{id}/enabled 启停知识段 */
+    @PutMapping("/knowledge/{id}/enabled")
+    public Result<Void> toggleKnowledge(@PathVariable Long id,
+                                        @RequestParam boolean enabled) {
+        knowledgeService.setEnabled(id, enabled);
+        return Result.ok("已更新", null);
+    }
+
+    /** DELETE /api/admin/knowledge/{id} 删除知识段 */
+    @DeleteMapping("/knowledge/{id}")
+    public Result<Void> deleteKnowledge(@PathVariable Long id) {
+        knowledgeService.delete(id);
+        return Result.ok("已删除", null);
+    }
+
+    /** POST /api/admin/knowledge/rebuild 手动触发全量索引重建（异步） */
+    @PostMapping("/knowledge/rebuild")
+    public Result<Void> rebuildKnowledge() {
+        knowledgeService.rebuildAsync();
+        return Result.ok("重建已启动", null);
+    }
+
+    /** GET /api/admin/knowledge/rebuild-status 重建状态（前端轮询） */
+    @GetMapping("/knowledge/rebuild-status")
+    public Result<Map<String, Object>> rebuildStatus() {
+        return Result.ok(knowledgeService.rebuildStatus());
     }
 }
