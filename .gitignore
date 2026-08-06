@@ -44,3 +44,7 @@ Thumbs.db
 # xyhm 站点分析临时截图（勿提交）
 xyhm*.png
 explore_xyhm*.png
+
+# 浏览器验证截图（勿提交）
+pixel*.png
+verify_*.png
