@@ -93,6 +93,10 @@ app:
       rrf-k: 60             # RRF 常数
       rerank-enabled: true  # 是否启用 qwen3-rerank 精排
       rerank-top-n: 10      # 送入精排的候选条数
+    # HyDE 分流：复杂问题先 LLM 生成假设性回答再检索，简单问题直接标准 RAG（省成本）
+    hyde:
+      enabled: true          # 是否启用 HyDE 分流（评估后可按数据决定开/关）
+      length-threshold: 40   # 长度阈值（字），query 超过视为复杂
   # 文件保存工具：职业规划、技能清单等保存目录
   file-save:
     base-dir: ${FILE_SAVE_DIR:./data/files}

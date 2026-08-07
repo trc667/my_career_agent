@@ -805,4 +805,67 @@ class RagEvaluatorTest {
             seen.putIfAbsent(text, docs.get(i));
         }
     }
+
+    // ==================== HyDE 分流对比：全标准 / 全 HyDE / 按复杂度分流 ====================
+
+    /**
+     * 评估 HyDE 分流策略：简单问题走标准 RAG，复杂问题才走 HyDE（省 LLM 成本 + 提升复杂问题召回）。
+     * 对比三路：A=全标准、B=全 HyDE、C=分流（ComplexityClassifier.isComplex 判断）。
+     * 额外统计复杂子集上 A vs C 的增益，验证分流策略的价值点。
+     * <p>
+     * 默认取前 50 条 QA 子集（每次 HyDE 需一次 LLM 调用）；全量 328 条约 10-20 分钟，
+     * 需要时可把 SAMPLE_SIZE 调大或改为 QA_PAIRS.length。
+     */
+    @Test
+    void compareHydeSplit() {
+        // 子集样本数：全量 328 次 LLM 调用太耗时，默认取前 50 条做代表性抽样
+        int sampleSize = 50;
+        int maxK = 5;
+        int total = Math.min(sampleSize, QA_PAIRS.length);
+        int[] aHits = {0, 0, 0}, bHits = {0, 0, 0}, cHits = {0, 0, 0};
+        int[] aCHits = {0, 0, 0}, cCHits = {0, 0, 0}; // 复杂子集
+        double aMRR = 0, bMRR = 0, cMRR = 0, aCMRR = 0, cCMRR = 0;
+        int complexCount = 0;
+
+        for (int i = 0; i < total; i++) {
+            Object[] pair = QA_PAIRS[i];
+            String q = (String) pair[0];
+            String exp = (String) pair[1];
+            boolean complex = ComplexityClassifier.isComplex(q, 40);
+            if (complex) complexCount++;
+
+            // HyDE 假设文档（B、C 两路共用同一份，公平对照）
+            String hydeQ = QueryRewriter.hydeRewrite(q, chatModel);
+
+            // A 全标准
+            List<Document> aDocs = vectorStore.similaritySearch(SearchRequest.builder().query(q).topK(maxK).build());
+            stats(aHits, aDocs, exp); aMRR += mrrc(aDocs, exp);
+
+            // B 全 HyDE
+            List<Document> bDocs = vectorStore.similaritySearch(SearchRequest.builder().query(hydeQ).topK(maxK).build());
+            stats(bHits, bDocs, exp); bMRR += mrrc(bDocs, exp);
+
+            // C 分流：复杂 → HyDE，简单 → 标准
+            String splitQ = complex ? hydeQ : q;
+            List<Document> cDocs = vectorStore.similaritySearch(SearchRequest.builder().query(splitQ).topK(maxK).build());
+            stats(cHits, cDocs, exp); cMRR += mrrc(cDocs, exp);
+
+            if (complex) {
+                stats(aCHits, aDocs, exp); aCMRR += mrrc(aDocs, exp);
+                stats(cCHits, cDocs, exp); cCMRR += mrrc(cDocs, exp);
+            }
+        }
+
+        System.out.println("========== HyDE 分流对比（" + total + " QA，复杂占比 " + pct(complexCount, total) + "）==========");
+        System.out.printf("%-14s %-12s %-12s %-12s%n", "指标", "全标准A", "全HyDE B", "分流C");
+        System.out.printf("%-14s %-12s %-12s %-12s%n", "----", "-------", "--------", "------");
+        System.out.printf("%-14s %-12s %-12s %-12s%n", "Recall@1", pct(aHits[0], total), pct(bHits[0], total), pct(cHits[0], total));
+        System.out.printf("%-14s %-12s %-12s %-12s%n", "Recall@5", pct(aHits[2], total), pct(bHits[2], total), pct(cHits[2], total));
+        System.out.printf("%-14s %-12.4f %-12.4f %-12.4f%n", "MRR", aMRR / total, bMRR / total, cMRR / total);
+        System.out.println("--- 复杂子集（" + complexCount + " QA）：全标准 vs 分流（HyDE 只作用于该子集） ---");
+        System.out.printf("%-14s %-12s %-12s%n", "指标", "全标准A", "分流C");
+        System.out.printf("%-14s %-12s %-12s%n", "Recall@1", pct(aCHits[0], complexCount), pct(cCHits[0], complexCount));
+        System.out.printf("%-14s %-12s %-12s%n", "Recall@5", pct(aCHits[2], complexCount), pct(cCHits[2], complexCount));
+        System.out.printf("%-14s %-12.4f %-12.4f%n", "MRR", aCMRR / complexCount, cCMRR / complexCount);
+    }
 }

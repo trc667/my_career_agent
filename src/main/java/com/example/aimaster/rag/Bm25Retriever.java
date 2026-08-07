@@ -128,7 +128,8 @@ public class Bm25Retriever {
             QueryParser parser = new QueryParser(FIELD_CONTENT, analyzer);
             // 放宽为 OR 语义：CJK bigram 分词后任意词命中即召回，避免 AND 导致召回为 0
             parser.setDefaultOperator(QueryParser.Operator.OR);
-            Query q = parser.parse(query);
+            // escape 特殊字符（如 HyDE 假设文档中的 >、/、（ 等），否则 QueryParser 抛 Lexical error
+            Query q = parser.parse(QueryParser.escape(query));
             ScoreDoc[] hits = searcher.search(q, Math.max(topN, 1)).scoreDocs;
             List<org.springframework.ai.document.Document> docs = new ArrayList<>();
             for (ScoreDoc hit : hits) {

@@ -14,6 +14,8 @@ import com.example.aimaster.dto.ReActStep;
 import com.example.aimaster.filter.SensitiveWordFilter;
 import com.example.aimaster.memory.ContextCompressor;
 import com.example.aimaster.memory.ConversationMemoryStore;
+import com.example.aimaster.rag.ComplexityClassifier;
+import com.example.aimaster.rag.QueryRewriter;
 import com.example.aimaster.rag.RagDocumentLoader;
 import com.example.aimaster.service.CareerMasterService;
 import com.example.aimaster.service.FaqService;
@@ -93,6 +95,8 @@ public class CareerMasterServiceImpl implements CareerMasterService {
     private final boolean reactStreamMcpEnabled;
     private final int reactStreamTypingDelayMs;
     private final int reactStepTimeoutMs;
+    private final boolean hydeEnabled;
+    private final int hydeLengthThreshold;
 
     public CareerMasterServiceImpl(
             ChatModel chatModel,
@@ -112,7 +116,9 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             @Value("${app.react-stream.tools-enabled:true}") boolean reactStreamToolsEnabled,
             @Value("${app.react-stream.mcp-enabled:false}") boolean reactStreamMcpEnabled,
             @Value("${app.react-stream.typing-delay-ms:40}") int reactStreamTypingDelayMs,
-            @Value("${app.react-stream.step-timeout-ms:30000}") int reactStepTimeoutMs) {
+            @Value("${app.react-stream.step-timeout-ms:30000}") int reactStepTimeoutMs,
+            @Value("${app.rag.hyde.enabled:true}") boolean hydeEnabled,
+            @Value("${app.rag.hyde.length-threshold:40}") int hydeLengthThreshold) {
         this.chatModel = chatModel;
         this.streamingChatModel = streamingChatModel;
         this.systemPrompt = systemPrompt;
@@ -131,6 +137,8 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         this.reactStreamMcpEnabled = reactStreamMcpEnabled;
         this.reactStreamTypingDelayMs = reactStreamTypingDelayMs;
         this.reactStepTimeoutMs = Math.max(5_000, reactStepTimeoutMs);
+        this.hydeEnabled = hydeEnabled;
+        this.hydeLengthThreshold = Math.max(10, hydeLengthThreshold);
     }
 
     private static final String SENSITIVE_WORD_HINT =
@@ -315,6 +323,30 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         }
     }
 
+    /**
+     * 检索 query 决策链：多轮融合 → 复杂度分流 →（复杂）HyDE 假设文档检索 → 失败降级。
+     * 简单问题直接标准检索，避免为高成本 HyDE 付不必要的 LLM 调用。
+     */
+    private String buildSearchQuery(String conversationId, String currentInput) {
+        // ① 多轮历史融合：历史问题并入 query，提升指代性问题召回
+        String fused = buildRagQuery(conversationId, currentInput);
+        // ② HyDE 分流：关闭或非复杂问题直接标准检索
+        if (!hydeEnabled || !ComplexityClassifier.isComplex(fused, hydeLengthThreshold)) {
+            return fused;
+        }
+        // ③ 复杂问题：LLM 生成假设性回答 → 用它检索（语义更贴近知识库文档）
+        try {
+            String hyde = QueryRewriter.hydeRewrite(fused, chatModel);
+            if (hyde != null && !hyde.isBlank()) {
+                log.info("HyDE 分流生效：query {} 字 → HyDE {} 字", fused.length(), hyde.length());
+                return hyde;
+            }
+        } catch (Exception e) {
+            log.warn("HyDE 生成失败，降级标准 RAG：{}", e.getMessage());
+        }
+        return fused;
+    }
+
     private String extractReplyText(org.springframework.ai.chat.model.ChatResponse response) {
         if (response == null) return "";
         Generation gen = response.getResult();
@@ -354,8 +386,8 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             return ChatResponse.builder().conversationId(id).usageTokens(0).reply(cached).build();
         }
 
-        // 多轮历史融合检索：历史问题并入 query，提升指代性问题召回
-        String context = retrieveRagContext(buildRagQuery(id, input));
+        // 多轮历史融合 + HyDE 分流检索
+        String context = retrieveRagContext(buildSearchQuery(id, input));
         String systemWithContext = systemPrompt.replace("{context}", context != null ? context : "");
         List<Message> msgList = buildPromptMessages(id, systemWithContext, input);
         Prompt prompt = new Prompt(msgList);
@@ -404,8 +436,8 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         if (cached != null) {
             return new ChatStreamSession(id, Flux.just(cached));
         }
-        // 多轮历史融合检索：历史问题并入 query，提升指代性问题召回
-        String context = retrieveRagContext(buildRagQuery(id, input));
+        // 多轮历史融合 + HyDE 分流检索
+        String context = retrieveRagContext(buildSearchQuery(id, input));
         String systemWithContext = systemPrompt.replace("{context}", context != null ? context : "");
         List<Message> msgList = buildPromptMessages(id, systemWithContext, input);
         Flux<String> flux;
