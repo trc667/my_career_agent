@@ -32,6 +32,7 @@
 ① Query 预处理 → ② embedding → ③ 向量+BM25 多路召回(RRF k60) → ④ qwen3-rerank 精排 → ⑤ Prompt拼装 → ⑥ 生成+【来源】标注
 ```
 - 核心组件：`HybridRetriever`（生产检索）、`Bm25Retriever`（IK 分词）、`Reranker`（qwen3-rerank）、`RagDocumentLoader`（入库/向量检索）
+- 检索 query 决策链：多轮历史融合 → 复杂度分流 →（复杂）HyDE 假设文档（`CareerMasterServiceImpl.buildSearchQuery` + `ComplexityClassifier`）
 - 入口：`CareerMasterServiceImpl.chatWithRag`（同步）/ `chatWithRagStream`（SSE 流式）
 
 ## 三、已上线功能
@@ -45,7 +46,8 @@
 7. **用户协议/隐私政策**：/agreement 页面 + 注册强制勾选（前后端双重校验）+ 首页/登录页入口
 8. **知识库管理入口**（管理后台「知识库管理」tab）：629 段知识在线增删改查 + 启停，变更后异步重建 pgvector/BM25/八股三处索引（`KnowledgeService`/`AdminController`/`AdminView.vue`）
 9. **多轮历史融合检索 + 语义缓存**：检索 query 并入最近 1-2 轮历史问题（指代性问题召回提升）；相同独立问题 30 分钟内直接命中缓存答案（20ms/0 token）（`CareerMasterServiceImpl.buildRagQuery`/`SemanticCache`）
-10. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
+10. **Prompt 结构优化 + HyDE 分流**：回答策略分层（事实依据/来源标注/拒答区分）；复杂问题先 LLM 生成假设文档再检索，简单问题标准 RAG（`CareerMasterPrompt`/`ComplexityClassifier`）
+11. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
 
 ## 四、本轮任务进度（已完成并验证）
 
@@ -71,6 +73,7 @@
 | 知识库管理入口（管理后台在线增删改查知识段，DB 事实源 + 变更后异步重建三处索引） | ✅ |
 | 多轮历史融合检索 + 语义缓存（指代性问题融合历史 query；相同问题 20ms/0token 命中） | ✅ |
 | 缓存升级 Caffeine（语义/摘要缓存容量上限 + 过期原生管理，替代手写 ConcurrentHashMap 淘汰） | ✅ |
+| Prompt 结构优化 + HyDE 分流（分层回答策略；复杂问题 HyDE 假设文档检索，失败降级） | ✅ |
 | Git 提交（安全审查通过，分模块推送 GitHub） | ✅ |
 
 ## 五、量化成果（面试数据）
@@ -81,20 +84,22 @@
 - BM25 互补性：39/328 查询仅 BM25 命中向量漏检（全为专有名词类）
 - 知识库管理入口验证：新增→异步重建 33s→八股同步；启动重建 39s
 - 语义缓存验证：相同问题第二次命中 20ms / 0 token（对比首次 5.2s / 1335 token）
+- HyDE 分流验证（50 QA 子集）：全 HyDE 反而降 R@1 2pp → 不能无脑全量；分流 = 全标准效果 + 复杂子集 MRR 0.8125→0.8750（+0.0625），且仅 8% 复杂问题付 HyDE 成本 → 默认开启分流；全量可跑 `mvn test -Dtest=RagEvaluatorTest#compareHydeSplit`（调大 sampleSize）
 
 ## 六、关键文件清单
 
-- RAG：`rag/HybridRetriever`、`Bm25Retriever`、`Reranker`、`KnowledgeBatchGenerator`、`QueryRewriter`、`RagDocumentLoader`
-- 评估：`test/.../RagEvaluatorTest`（compareHybrid 三分词器对比）
+- RAG：`rag/HybridRetriever`、`Bm25Retriever`、`Reranker`、`KnowledgeBatchGenerator`、`QueryRewriter`、`RagDocumentLoader`、`rag/ComplexityClassifier`（规则版复杂度分流）
+- 评估：`test/.../RagEvaluatorTest`（compareHybrid 三分词器对比 / compareRewrite HyDE 三路 / compareHydeSplit 分流对比）
 - 头像：`service/OssStorageService`、`controller/AppConfigController`、前端 `ChatMessageList`/`UserCenterView`/`AdminView`/`authStore`
 - 八股：`service/BaguService`、`controller/BaguController`、`views/BaguView`
 - 简历：`service/ResumeReviewService`、`controller/ResumeController`、`dto/ResumeReview*`、前端 `views/ResumeReviewView`、`api/resume.ts`、表 `resume_review`
 - 聊天历史：`controller/ConversationController`、`memory/DbConversationMemoryStore`、`config/MemoryConfig`、前端 `store/loveMasterStore`、`api/conversation.ts`、表 `conversation`/`conversation_message`
-- 上下文压缩：`memory/ContextCompressor`（token 预算裁剪 + LLM 摘要压缩 + 会话缓存）、`CareerMasterServiceImpl.buildPromptMessages`、配置 `app.memory.history-token-budget`/`enable-summary`/`summary-max-chars`
+- 上下文压缩：`memory/ContextCompressor`（token 预算裁剪 + LLM 摘要压缩 + Caffeine 会话缓存）、`CareerMasterServiceImpl.buildPromptMessages`、配置 `app.memory.history-token-budget`/`enable-summary`/`summary-cache-*`
 - FAQ 拦截：`service/FaqService`（12 条 FAQ 库 + 归一化 + 精确/包含/相似度三级匹配）、`CareerMasterServiceImpl.tryFaq`（职规大师与超级智能体四个入口均接入）
 - 多轮融合检索：`CareerMasterServiceImpl.buildRagQuery`（最近 1-2 轮用户问题并入检索 query，截断 60 字）
 - 语义缓存：`service/SemanticCache`（Caffeine：容量 200 + 写入 30min 过期 + recordStats，仅新会话首轮生效）、配置 `app.semantic-cache.*`
-- 会话摘要缓存：`memory/ContextCompressor`（Caffeine：容量 500 + 空闲 6h 过期，防旧会话堆积 OOM）、配置 `app.memory.summary-cache-*`
+- HyDE 分流：`CareerMasterServiceImpl.buildSearchQuery`（融合→复杂度→HyDE→降级）、`rag/ComplexityClassifier`、`QueryRewriter.hydeRewrite`、配置 `app.rag.hyde.*`
+- Prompt：`config/CareerMasterPrompt`（分层回答策略：事实依据/来源标注/拒答区分/篇幅结构）
 - 协议：前端 `views/AgreementView`、路由 `/agreement`
 - 像素风：`styles/pixel.css`（工具类）、`components/PixelIcon.vue`（pixelarticons 像素图标）、依赖 `pixelarticons`/`@fontsource/press-start-2p`
 - 知识库：`resources/rag/career-tips.txt`（629 段种子源，仅首次导入用）；`entity/Knowledge` + `mapper/KnowledgeMapper` + `service/KnowledgeService`（DB 事实源，在线增删改查 + 异步全量重建 pgvector/BM25/八股缓存）；表 `knowledge`
@@ -113,6 +118,7 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - 测试账号：testuser01 / test123456；admin 账号 demo / 123456（已提升 ADMIN）
 - 知识库扩容：`mvn spring-boot:run "-Dspring-boot.run.arguments=--spring.profiles.active=raggen"`（topics 在 application-raggen.yml）
 - 管理后台：登录 demo → 访问 /admin（或登录页进入），「知识库管理」tab 在线维护知识段
+- RAG 评估：`mvn test -Dtest=RagEvaluatorTest`（compareHydeSplit 默认 50 QA 子集约 5 分钟，全量 328 需调大 sampleSize）
 
 ## 八、待办（按 P 级排序）
 
@@ -129,7 +135,7 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 
 ### P2 RAG 进阶 + 架构 + 商业化起步
 - [x] 多轮历史融合检索、语义缓存
-- [ ] Prompt 结构优化 + HyDE 分流（简单问题标准 RAG，复杂问题 HyDE）
+- [x] Prompt 结构优化 + HyDE 分流（简单问题标准 RAG，复杂问题 HyDE）
 - [x] 知识库管理入口（管理后台在线增删改查知识段）
 - [ ] docker-compose 编排
 - [ ] 商业化：积分/会员体系（用户分级免费/付费 + 签到积分 + 限流分级）
@@ -148,7 +154,7 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - OSS AI 头像 key 双扩展名 bug：固定 key 上传不能走通用 upload（已修复）
 - Spring AI MCP 初始化 180s 超时 → 启动参数禁用
 - SearchReplace 偶发"partial success/save failed"可能是**真实回滚**：必须用 Grep/javap 验证关键代码是否真写入（AdminController 曾残留旧 class 导致新接口 404；对持续失败文件改用 Write 完整覆盖）；还可能**重复写入**（部分成功时方法插入两次，需 Grep 发现并清理重复）
-- 8080 端口被旧实例占用 → `Get-NetTCPConnection` 在该环境不可靠，用 `Get-CimInstance` 定位 java 进程 + `Stop-Process -Force -ErrorAction Stop` 并复核（注意：命令取多个 PID 时可能只停第一个，需逐一核对）
+- 8080 端口被旧实例占用 → `Get-NetTCPConnection` 在该环境不可靠，用 `Get-CimInstance` 定位 java 进程 + `Stop-Process -Force -ErrorAction Stop` 并复核（注意：命令取多个 PID 时可能只停第一个，需逐一核对；CreationDate 时间过滤可能失效，直接按 PID 操作最稳）
 - 简历评分同步接口实际耗时 30-40s > 前端 axios 全局超时 20s → 评分接口单独设 `timeout: 90000`
 - Vite 端口被占自动漂移（5175→5176）时后端 CORS 白名单需含该端口
 - 前端 `api/chatStream.ts` 用 fetch+ReadableStream，停止生成靠 AbortController，后端 `isClientDisconnected` 已兼容断连
@@ -156,3 +162,5 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - 知识库变更后异步重建约 30-40s（629 段 embedding），期间检索用旧索引，前端轮询 rebuild-status 感知完成
 - 语义缓存验证：日志出现「语义缓存命中」即生效；仅新会话首轮（无历史上下文）才缓存/命中，多轮对话不缓存防错配
 - 缓存规范：业务缓存统一用 Caffeine（容量上限 + 过期原生管理），禁止裸 ConcurrentHashMap 手写 TTL/淘汰；Redis 仅在多实例共享/跨重启持久/跨实例会话摘要时引入
+- HyDE 假设文档含 `>`/`/`/`（` 等特殊字符会导致 Lucene QueryParser Lexical error → BM25 检索前必须 `QueryParser.escape(query)`（已修复）
+- HyDE 分流验证：日志「HyDE 分流生效：query N 字 → HyDE M 字」即触发；默认开启，量化增益后可按数据调 `app.rag.hyde.enabled`
