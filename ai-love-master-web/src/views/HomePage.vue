@@ -385,9 +385,7 @@
     <footer class="home__footer">
       <span>© 2026 AI 职规助手</span>
       <span class="home__footer-sep">·</span>
-      <router-link to="/agreement" class="home__footer-link">用户协议</router-link>
-      <span class="home__footer-sep">·</span>
-      <router-link to="/agreement#privacy" class="home__footer-link">隐私政策</router-link>
+      <router-link to="/agreement" class="home__footer-link">用户协议与隐私政策</router-link>
     </footer>
   </div>
 </template>

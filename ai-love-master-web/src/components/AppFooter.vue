@@ -6,8 +6,7 @@
       </div>
       <div class="app-footer__links">
         <router-link to="/feedback" class="app-footer__link app-footer__link--clickable">意见反馈</router-link>
-        <router-link to="/agreement" class="app-footer__link app-footer__link--clickable">用户协议</router-link>
-        <router-link to="/agreement#privacy" class="app-footer__link app-footer__link--clickable">隐私政策</router-link>
+        <router-link to="/agreement" class="app-footer__link app-footer__link--clickable">用户协议与隐私政策</router-link>
       </div>
       <span class="app-footer__link app-footer__link--clickable" @click="showWechat">联系我们</span>
       <span class="app-footer__author">作者：richard谭</span>
