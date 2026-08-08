@@ -6,10 +6,12 @@ import java.util.List;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.example.aimaster.entity.InviteReward;
 import com.example.aimaster.entity.PointLog;
 import com.example.aimaster.entity.SignIn;
 import com.example.aimaster.entity.User;
 import com.example.aimaster.exception.BusinessException;
+import com.example.aimaster.mapper.InviteRewardMapper;
 import com.example.aimaster.mapper.PointLogMapper;
 import com.example.aimaster.mapper.SignInMapper;
 import com.example.aimaster.mapper.UserMapper;
@@ -39,15 +41,20 @@ public class PointService {
     private static final int STREAK_BONUS_POINTS = 10;
     /** 连续签到奖励周期（天） */
     private static final int STREAK_CYCLE = 7;
+    /** 邀请好友完成首聊奖励积分 */
+    private static final int INVITE_REWARD_POINTS = 50;
 
     private final UserMapper userMapper;
     private final PointLogMapper pointLogMapper;
     private final SignInMapper signInMapper;
+    private final InviteRewardMapper inviteRewardMapper;
 
-    public PointService(UserMapper userMapper, PointLogMapper pointLogMapper, SignInMapper signInMapper) {
+    public PointService(UserMapper userMapper, PointLogMapper pointLogMapper, SignInMapper signInMapper,
+                        InviteRewardMapper inviteRewardMapper) {
         this.userMapper = userMapper;
         this.pointLogMapper = pointLogMapper;
         this.signInMapper = signInMapper;
+        this.inviteRewardMapper = inviteRewardMapper;
     }
 
     /** 用户积分画像（含今日签到状态与连续天数） */
@@ -171,6 +178,42 @@ public class PointService {
                 .userId(user.getId()).changePoints(-cost).reason("AI 对话消耗")
                 .createTime(LocalDateTime.now()).build());
         log.info("对话消耗积分: username={} cost={}", username, cost);
+    }
+
+    /**
+     * 邀请好友完成首轮对话奖励（分享裂变）：被邀人完成首聊后调用。
+     * 幂等防刷：invite_reward 表 (inviter_id, invitee_id) 唯一键，同一组合只奖一次；
+     * 邀请人可能是 VIP/ADMIN 也正常发分（积分与等级独立）。
+     */
+    public void rewardInviterOnFirstChat(String inviteeUsername) {
+        if (inviteeUsername == null || inviteeUsername.isBlank()) return;
+        User invitee = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, inviteeUsername.trim()));
+        if (invitee == null || invitee.getInviterId() == null) return;
+        Long inviterId = invitee.getInviterId();
+        if (userMapper.selectById(inviterId) == null) return; // 邀请人已不存在
+        long count = inviteRewardMapper.selectCount(new LambdaQueryWrapper<InviteReward>()
+                .eq(InviteReward::getInviterId, inviterId)
+                .eq(InviteReward::getInviteeId, invitee.getId()));
+        if (count > 0) {
+            log.info("邀请奖励已发放过，跳过: inviter={} invitee={}", inviterId, invitee.getId());
+            return;
+        }
+        inviteRewardMapper.insert(InviteReward.builder()
+                .inviterId(inviterId).inviteeId(invitee.getId()).points(INVITE_REWARD_POINTS)
+                .createTime(LocalDateTime.now()).build());
+        addPoints(inviterId, INVITE_REWARD_POINTS, "邀请好友完成首聊奖励");
+        log.info("邀请奖励发放: inviter={} invitee={} +{}分", inviterId, invitee.getId(), INVITE_REWARD_POINTS);
+    }
+
+    /** 邀请信息（前端「邀请好友」卡片）：邀请码=userId、已成功邀请数、每单奖励 */
+    public java.util.Map<String, Object> inviteProfile(Long userId) {
+        long rewardedCount = inviteRewardMapper.selectCount(new LambdaQueryWrapper<InviteReward>()
+                .eq(InviteReward::getInviterId, userId));
+        java.util.Map<String, Object> m = new java.util.HashMap<>();
+        m.put("inviteCode", userId);
+        m.put("invitedCount", rewardedCount);
+        m.put("rewardPoints", INVITE_REWARD_POINTS);
+        return m;
     }
 
     /** 计算连续签到天数：signedToday 为 true 从今天算起，否则从昨天算起 */

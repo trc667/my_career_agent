@@ -56,6 +56,10 @@ public class User {
     @TableField("vip_expire_at")
     private LocalDateTime vipExpireAt;
 
+    /** 邀请人用户 ID（分享裂变：注册时通过邀请码绑定） */
+    @TableField("inviter_id")
+    private Long inviterId;
+
     @TableField("created_at")
     private LocalDateTime createTime;
 

@@ -295,6 +295,18 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         }
     }
 
+    /** 被邀人完成首轮对话 → 邀请人 +50 积分（分享裂变，幂等防刷） */
+    private void rewardInviteOnFirstChat(String id, String username) {
+        try {
+            // 历史恰好剩本轮 user+assistant 两条 = 首轮完成
+            if (memoryStore.getMessages(id).size() == 2) {
+                pointService.rewardInviterOnFirstChat(username);
+            }
+        } catch (Exception e) {
+            log.warn("邀请奖励触发失败（不影响主流程）: {}", e.getMessage());
+        }
+    }
+
     /**
      * FAQ 拦截：命中返回标准答案并写入会话历史，跳过 RAG 检索与 LLM 调用（省 token、响应快）。
      *
@@ -438,6 +450,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         memoryStore.add(id, new UserMessage(input));
         memoryStore.add(id, new AssistantMessage(reply != null ? reply : ""));
         cacheIfFresh(id, userMessage, reply);
+        rewardInviteOnFirstChat(id, currentUsername());
 
         return ChatResponse.builder().conversationId(id).usageTokens(usage).reply(reply != null ? reply : "").build();
     }
@@ -491,7 +504,10 @@ public class CareerMasterServiceImpl implements CareerMasterService {
                     .filter(s -> s != null && !s.isEmpty())
                     .map(this::filterText)
                     .doOnNext(replyBuf::append)
-                    .doOnComplete(() -> cacheIfFresh(id, userMessage, replyBuf.toString()));
+                    .doOnComplete(() -> {
+                        cacheIfFresh(id, userMessage, replyBuf.toString());
+                        rewardInviteOnFirstChat(id, currentUsername());
+                    });
         } else {
             String fullReply = filterText(extractReplyText(chatModel.call(new Prompt(msgList))));
             cacheIfFresh(id, userMessage, fullReply);
