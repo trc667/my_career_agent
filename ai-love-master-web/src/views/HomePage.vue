@@ -1115,9 +1115,9 @@ function dotStyle(n: number) {
   border-radius: var(--app-radius-lg);
 }
 
-/* 商用风：hover 上浮而非 3D 翻转 */
+/* 悬停翻转展示背面功能列表（与「悬停看看能帮你做什么」文案一致） */
 .app-card:hover .app-card__inner {
-  transform: translateY(-4px);
+  transform: rotateY(180deg);
 }
 
 .app-card:hover .app-card__face--front {
@@ -1126,7 +1126,7 @@ function dotStyle(n: number) {
 }
 
 .app-card:active .app-card__inner {
-  transform: scale(0.98);
+  transform: rotateY(180deg) scale(0.97);
 }
 
 .app-card__face {
