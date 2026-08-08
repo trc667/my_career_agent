@@ -115,6 +115,7 @@ public class InterviewService {
     private final UserMapper userMapper;
     private final ObjectMapper objectMapper;
     private final InterviewRecordMapper interviewRecordMapper;
+    private final BaguPracticeService baguPracticeService;
 
     /** sessionId → 面试会话 */
     private final Cache<String, Session> sessions = Caffeine.newBuilder()
@@ -129,13 +130,15 @@ public class InterviewService {
 
     public InterviewService(ChatModel chatModel, HybridRetriever hybridRetriever,
                             BaguService baguService, UserMapper userMapper, ObjectMapper objectMapper,
-                            InterviewRecordMapper interviewRecordMapper) {
+                            InterviewRecordMapper interviewRecordMapper,
+                            BaguPracticeService baguPracticeService) {
         this.chatModel = chatModel;
         this.hybridRetriever = hybridRetriever;
         this.baguService = baguService;
         this.userMapper = userMapper;
         this.objectMapper = objectMapper;
         this.interviewRecordMapper = interviewRecordMapper;
+        this.baguPracticeService = baguPracticeService;
     }
 
     /** 开始面试：次数校验 → 抽 5 题 → 建会话 → 返回第 1 题 */
@@ -286,6 +289,37 @@ public class InterviewService {
         } catch (Exception e) {
             log.warn("面试记录 JSON 解析失败: {}", e.getMessage());
             return new ArrayList<>();
+        }
+    }
+
+    /** 将某场面试的第 index 题加入错题本（幂等：同题重复加入只 +1），返回是否新加入 */
+    public Map<String, Object> addToWrong(Long userId, Long recordId, int itemIndex) {
+        InterviewRecord r = interviewRecordMapper.selectById(recordId);
+        if (r == null || !r.getUserId().equals(userId)) throw new BusinessException("记录不存在");
+        List<Object> items = parseJson(r.getItemsJson());
+        if (itemIndex < 0 || itemIndex >= items.size()) throw new BusinessException("题目索引不合法");
+        Map<String, Object> item = (Map<String, Object>) items.get(itemIndex);
+        String question = String.valueOf(item.getOrDefault("question", ""));
+        if (question.isBlank()) throw new BusinessException("题目内容缺失");
+        com.example.aimaster.entity.BaguWrong row = baguPracticeService.addWrong(userId, sha12(question), "面试", question);
+        Map<String, Object> m = new HashMap<>();
+        m.put("added", row.getWrongCount() != null && row.getWrongCount() == 1);
+        m.put("wrongCount", row.getWrongCount());
+        return m;
+    }
+
+    /** 内容 SHA-256 前 12 位 hex（与八股知识条目 id 生成规则一致，保证同题幂等） */
+    private String sha12(String content) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < 6; i++) {
+                sb.append(String.format("%02x", digest[i]));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return String.valueOf(content.hashCode());
         }
     }
 

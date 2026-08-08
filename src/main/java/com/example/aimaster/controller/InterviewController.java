@@ -93,4 +93,12 @@ public class InterviewController {
         if (userId == null) return Result.fail(401, "未登录或账号不存在");
         return Result.ok(interviewService.recordDetail(userId, id));
     }
+
+    /** POST /api/interview/records/{id}/wrong?index=0 将某题加入错题本（幂等） */
+    @PostMapping("/records/{id}/wrong")
+    public Result<Map<String, Object>> addWrong(@PathVariable Long id, @RequestParam int index) {
+        Long userId = currentUserId();
+        if (userId == null) return Result.fail(401, "未登录或账号不存在");
+        return Result.ok(interviewService.addToWrong(userId, id, index));
+    }
 }

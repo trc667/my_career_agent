@@ -26,6 +26,30 @@
     </div>
 
     <div v-else class="ir-list">
+      <!-- 面试进步趋势 -->
+      <div v-if="records.length >= 2" class="ir-trend">
+        <div class="ir-trend__head">
+          <span class="ir-trend__title">📈 面试进步趋势</span>
+          <span class="ir-trend__tip">最近 {{ records.length }} 场</span>
+        </div>
+        <svg viewBox="0 0 600 180" class="ir-trend__svg">
+          <defs>
+            <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#2f6bff" />
+              <stop offset="100%" stop-color="#2f6bff" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          <line v-for="gy in [40, 95, 150]" :key="gy" x1="60" :x2="540" :y1="gy" :y2="gy" class="ir-trend__grid" />
+          <polygon :points="trendArea" fill="url(#trendGrad)" />
+          <polyline :points="trendPoints" fill="none" stroke="#2f6bff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          <g v-for="(p, i) in trendData" :key="i">
+            <circle :cx="p.x" :cy="p.y" r="4.5" :fill="i === trendData.length - 1 ? '#16a34a' : '#2f6bff'" stroke="#fff" stroke-width="1.5" />
+            <text :x="p.x" :y="p.y - 12" text-anchor="middle" class="ir-trend__label">{{ p.score }}</text>
+            <text :x="p.x" :y="173" text-anchor="middle" class="ir-trend__x">第 {{ i + 1 }} 场</text>
+          </g>
+        </svg>
+      </div>
+
       <div v-for="r in records" :key="r.id" class="ir-card" @click="openDetail(r)">
         <div class="ir-card__head">
           <div class="ir-card__left">
@@ -59,6 +83,11 @@
             <span class="ir-detail__q-score app-num" :class="scoreClass(it.score)">{{ it.score }}</span>
           </div>
           <p class="ir-detail__comment">{{ it.comment }}</p>
+          <div v-if="it.score < 60" class="ir-detail__wrong">
+            <el-button size="small" type="warning" plain :loading="wrongLoadingIdx === i" @click="handleAddWrong(i)">
+              📕 加入错题本
+            </el-button>
+          </div>
         </div>
       </div>
     </el-dialog>
@@ -75,6 +104,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
+  addInterviewWrong,
   getInterviewRecordDetail,
   getInterviewRecords,
   type InterviewRecordDetail,
@@ -86,6 +116,22 @@ const loaded = ref(false);
 const showDetail = ref(false);
 const detail = ref<InterviewRecordDetail | null>(null);
 const detailTitle = computed(() => (detail.value ? `${detail.value.position}岗 · 面试详情` : '面试详情'));
+const wrongLoadingIdx = ref(-1);
+
+/* ===== 面试进步趋势（SVG 折线，不引 ECharts） ===== */
+const trendData = computed(() =>
+  records.value.map((r, i) => ({
+    score: r.totalScore,
+    x: 60 + (i * 480) / Math.max(1, records.value.length - 1),
+    y: 150 - (Math.min(100, r.totalScore) / 100) * 110,
+  })),
+);
+const trendPoints = computed(() => trendData.value.map((p) => `${p.x},${p.y}`).join(' '));
+const trendArea = computed(() => {
+  const pts = trendData.value;
+  if (!pts.length) return '';
+  return `${pts[0].x},150 ${pts.map((p) => `${p.x},${p.y}`).join(' ')} ${pts[pts.length - 1].x},150`;
+});
 
 onMounted(loadRecords);
 
@@ -107,6 +153,20 @@ async function openDetail(r: InterviewRecordItem) {
     showDetail.value = true;
   } catch {
     // 拦截器已提示
+  }
+}
+
+/** 低分题一键加入错题本（幂等，同题重复只 +1） */
+async function handleAddWrong(index: number) {
+  if (!detail.value) return;
+  wrongLoadingIdx.value = index;
+  try {
+    const res = await addInterviewWrong(detail.value.id, index);
+    ElMessage.success(res.data?.added ? '已加入错题本，去「八股练习场」复习吧' : '该题已在错题本中（次数 +1）');
+  } catch {
+    // 拦截器已提示
+  } finally {
+    wrongLoadingIdx.value = -1;
   }
 }
 
@@ -227,6 +287,56 @@ function formatTime(t?: string) {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* 面试进步趋势 */
+.ir-trend {
+  background: var(--app-card);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-md);
+  padding: 14px 16px 10px;
+  animation: app-fade-up 0.5s ease both;
+}
+
+.ir-trend__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.ir-trend__title {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.ir-trend__tip {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+
+.ir-trend__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.ir-trend__grid {
+  stroke: var(--app-border);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.ir-trend__label {
+  font-size: 12px;
+  font-weight: 700;
+  fill: var(--app-primary);
+}
+
+.ir-trend__x {
+  font-size: 10px;
+  fill: var(--app-text-secondary);
 }
 
 .ir-card {
@@ -387,6 +497,10 @@ function formatTime(t?: string) {
   font-size: 13px;
   color: var(--app-text-secondary);
   line-height: 1.7;
+}
+
+.ir-detail__wrong {
+  margin: 8px 0 0 30px;
 }
 
 .ir-page__bg {

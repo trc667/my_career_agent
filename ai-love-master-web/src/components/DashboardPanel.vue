@@ -277,4 +277,29 @@ const ringOffset = computed(() => RING_C * (1 - Math.min(100, Math.max(0, props.
   font-size: 11px;
   color: var(--app-accent-orange);
 }
+
+/* 移动端：积分数字与指标行紧凑化 */
+@media (max-width: 420px) {
+  .dash__points-value {
+    font-size: 32px;
+  }
+
+  .dash__ring-wrap {
+    width: 88px;
+    height: 88px;
+  }
+
+  .dash__ring-center {
+    padding-top: 28px;
+  }
+
+  .dash__stat {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .dash__stat-value {
+    font-size: 13px;
+  }
+}
 </style>

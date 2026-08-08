@@ -85,3 +85,12 @@ export function getInterviewRecords() {
 export function getInterviewRecordDetail(id: number) {
   return http.get<any, ResultWrapper<InterviewRecordDetail>>(`/api/interview/records/${id}`);
 }
+
+/** 将面试记录中某题加入错题本（幂等） */
+export function addInterviewWrong(id: number, index: number) {
+  return http.post<any, ResultWrapper<{ added: boolean; wrongCount: number }>>(
+    `/api/interview/records/${id}/wrong`,
+    null,
+    { params: { index } },
+  );
+}

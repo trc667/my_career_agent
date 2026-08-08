@@ -783,6 +783,18 @@ onMounted(() => {
   text-align: right;
 }
 
+/* 移动端：漏斗行紧凑化，避免横向溢出 */
+@media (max-width: 560px) {
+  .funnel__row {
+    grid-template-columns: 84px 1fr 32px 46px;
+    gap: 8px;
+  }
+
+  .funnel__stage {
+    font-size: 12px;
+  }
+}
+
 .admin-empty {
   text-align: center;
   padding: 60px 0;
