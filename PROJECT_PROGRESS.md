@@ -11,7 +11,7 @@
 **核心价值**：
 1. 回答可信：RAG 检索增强 + 【来源】标注，拒绝瞎编（无知识拒答）
 2. 场景齐全：职规咨询 / 简历评分 / 八股练习 / 超级智能体跑任务
-3. 留存闭环：错题本 + 每日打卡 + 聊天历史跨设备同步
+3. 留存闭环：错题本 + 每日打卡 + 聊天历史跨设备同步 + 签到积分
 4. 工程可运维：自建错误监控 + 数据库备份 + 全站像素风 UI
 
 **技术概览**：Spring Boot 后端 + Vue3 前端，核心卖点是**企业级 RAG 检索增强生成**（Recall@1 78%、MRR 0.85）。
@@ -24,7 +24,7 @@
 | 稀疏检索 | Lucene 9.11（IK-analyzer ik_smart 中文分词）+ BM25Similarity |
 | 本地缓存 | Caffeine（SemanticCache 语义问答 / ContextCompressor 会话摘要，容量+过期原生管理） |
 | 前端 | Vue3 + TS + Vite + Element Plus（`ai-love-master-web`，端口 5175） |
-| 存储 | MySQL（用户/公告/反馈/会话/消息/简历评分/知识库）、OSS（头像，阿里云 web-tlias-122） |
+| 存储 | MySQL（用户/公告/反馈/会话/消息/简历评分/知识库/积分流水/签到）、OSS（头像，阿里云 web-tlias-122） |
 
 ## 二、RAG 六流程（生产链路已全部接入）
 
@@ -47,7 +47,8 @@
 8. **知识库管理入口**（管理后台「知识库管理」tab）：629 段知识在线增删改查 + 启停，变更后异步重建 pgvector/BM25/八股三处索引（`KnowledgeService`/`AdminController`/`AdminView.vue`）
 9. **多轮历史融合检索 + 语义缓存**：检索 query 并入最近 1-2 轮历史问题（指代性问题召回提升）；相同独立问题 30 分钟内直接命中缓存答案（20ms/0 token）（`CareerMasterServiceImpl.buildRagQuery`/`SemanticCache`）
 10. **Prompt 结构优化 + HyDE 分流**：回答策略分层（事实依据/来源标注/拒答区分）；复杂问题先 LLM 生成假设文档再检索，简单问题标准 RAG（`CareerMasterPrompt`/`ComplexityClassifier`）
-11. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
+11. **积分/会员体系**：每日签到（连续 7 天奖励）+ 聊天点赞积分 + 流水可审计 + **聊天消耗积分**（职规 1 分/次、超级智能体 2 分/次，VIP/ADMIN 免扣，FAQ/缓存命中不扣）+ 首页顶栏积分徽章/状态条快捷签到 + VIP 分级限流（游客 10/FREE 20/VIP 60 次/分）（`PointService`/`RateLimitByLevelFilter`/`HomePage`/`UserCenterView`）
+12. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
 
 ## 四、本轮任务进度（已完成并验证）
 
@@ -74,6 +75,8 @@
 | 多轮历史融合检索 + 语义缓存（指代性问题融合历史 query；相同问题 20ms/0token 命中） | ✅ |
 | 缓存升级 Caffeine（语义/摘要缓存容量上限 + 过期原生管理，替代手写 ConcurrentHashMap 淘汰） | ✅ |
 | Prompt 结构优化 + HyDE 分流（分层回答策略；复杂问题 HyDE 假设文档检索，失败降级） | ✅ |
+| 积分/会员体系（签到积分 + 流水审计 + VIP 分级限流 + 个人中心卡片） | ✅ |
+| 聊天消耗积分 + 首页积分组件（FREE 扣分/VIP 免扣/FAQ 缓存不扣 + 顶栏徽章/快捷签到） | ✅ |
 | Git 提交（安全审查通过，分模块推送 GitHub） | ✅ |
 
 ## 五、量化成果（面试数据）
@@ -100,6 +103,7 @@
 - 语义缓存：`service/SemanticCache`（Caffeine：容量 200 + 写入 30min 过期 + recordStats，仅新会话首轮生效）、配置 `app.semantic-cache.*`
 - HyDE 分流：`CareerMasterServiceImpl.buildSearchQuery`（融合→复杂度→HyDE→降级）、`rag/ComplexityClassifier`、`QueryRewriter.hydeRewrite`、配置 `app.rag.hyde.*`
 - Prompt：`config/CareerMasterPrompt`（分层回答策略：事实依据/来源标注/拒答区分/篇幅结构）
+- 积分/会员：`service/PointService`（签到幂等/连续天数/流水审计/VIP 懒回落）、`security/RateLimitByLevelFilter`（游客10/FREE20/VIP60/ADMIN不限）、`entity/PointLog`+`entity/SignIn`+Mapper、接口 `/api/user/points`/`/api/user/sign-in`/`/api/admin/points`/`/api/admin/vip`、前端 `UserCenterView` 积分卡片
 - 协议：前端 `views/AgreementView`、路由 `/agreement`
 - 像素风：`styles/pixel.css`（工具类）、`components/PixelIcon.vue`（pixelarticons 像素图标）、依赖 `pixelarticons`/`@fontsource/press-start-2p`
 - 知识库：`resources/rag/career-tips.txt`（629 段种子源，仅首次导入用）；`entity/Knowledge` + `mapper/KnowledgeMapper` + `service/KnowledgeService`（DB 事实源，在线增删改查 + 异步全量重建 pgvector/BM25/八股缓存）；表 `knowledge`
@@ -115,7 +119,7 @@ mvn spring-boot:run "-Dspring-boot.run.arguments=--spring.profiles.active=dev"
 # 前端
 cd ai-love-master-web; npm run dev   # 5175，对接 8080
 ```
-- 测试账号：testuser01 / test123456；admin 账号 demo / 123456（已提升 ADMIN）
+- 测试账号：testuser01 / test123456（id=1）；admin 账号 demo / 123456（id=2，已提升 ADMIN）
 - 知识库扩容：`mvn spring-boot:run "-Dspring-boot.run.arguments=--spring.profiles.active=raggen"`（topics 在 application-raggen.yml）
 - 管理后台：登录 demo → 访问 /admin（或登录页进入），「知识库管理」tab 在线维护知识段
 - RAG 评估：`mvn test -Dtest=RagEvaluatorTest`（compareHydeSplit 默认 50 QA 子集约 5 分钟，全量 328 需调大 sampleSize）
@@ -137,8 +141,8 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - [x] 多轮历史融合检索、语义缓存
 - [x] Prompt 结构优化 + HyDE 分流（简单问题标准 RAG，复杂问题 HyDE）
 - [x] 知识库管理入口（管理后台在线增删改查知识段）
-- [ ] docker-compose 编排
-- [ ] 商业化：积分/会员体系（用户分级免费/付费 + 签到积分 + 限流分级）
+- [ ] docker-compose 编排 —— 【暂缓】待部署时一并实施
+- [x] 商业化：积分/会员体系（签到积分 + VIP 分级限流 + 流水审计）
 - [ ] 商业化：分享裂变（分享海报/链接，邀请好友解锁次数）
 
 ### P3 暂缓/锦上添花
@@ -164,3 +168,5 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - 缓存规范：业务缓存统一用 Caffeine（容量上限 + 过期原生管理），禁止裸 ConcurrentHashMap 手写 TTL/淘汰；Redis 仅在多实例共享/跨重启持久/跨实例会话摘要时引入
 - HyDE 假设文档含 `>`/`/`/`（` 等特殊字符会导致 Lucene QueryParser Lexical error → BM25 检索前必须 `QueryParser.escape(query)`（已修复）
 - HyDE 分流验证：日志「HyDE 分流生效：query N 字 → HyDE M 字」即触发；默认开启，量化增益后可按数据调 `app.rag.hyde.enabled`
+- 积分/会员验证：签到幂等（同日重复 400）；管理员发分写流水可审计；限流日志「分级限流触发」；PowerShell 测试脚本中已 JSON 字符串勿再 `ConvertTo-Json`（会二次转义导致 400）
+- 聊天扣分验证：FREE 对话 50→49 扣 1 分；FAQ/语义缓存命中不扣（没花 LLM 钱）；VIP/ADMIN 免扣；扣分用原子 SQL（UPDATE ... WHERE points >= cost）防并发超扣
