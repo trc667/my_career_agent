@@ -6,7 +6,18 @@
       <router-link to="/interview" class="ir-page__new">+ 开始新面试</router-link>
     </div>
 
-    <div v-if="!loaded" class="ir-loading">加载中…</div>
+    <div v-if="!loaded" class="ir-skeleton">
+      <el-skeleton v-for="n in 3" :key="n" animated class="ir-skeleton__card">
+        <template #template>
+          <div class="ir-skeleton__head">
+            <el-skeleton-item variant="text" style="width: 60px; height: 22px" />
+            <el-skeleton-item variant="text" style="width: 50px; height: 26px" />
+          </div>
+          <el-skeleton-item variant="text" style="width: 100%; height: 8px" />
+          <el-skeleton-item variant="text" style="width: 80%; height: 8px" />
+        </template>
+      </el-skeleton>
+    </div>
 
     <div v-else-if="!records.length" class="ir-empty">
       <p class="ir-empty__icon">🎯</p>
@@ -162,6 +173,31 @@ function formatTime(t?: string) {
   text-align: center;
   color: var(--app-text-secondary);
   padding: 80px 0;
+}
+
+.ir-skeleton {
+  position: relative;
+  z-index: 2;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ir-skeleton__card {
+  background: var(--app-card);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-sm);
+  padding: 16px 18px;
+}
+
+.ir-skeleton__head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
 
 .ir-empty {

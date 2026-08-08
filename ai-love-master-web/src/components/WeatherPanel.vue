@@ -3,38 +3,56 @@
     <!-- 动态天气画布（雨/雪/雾/晴光等） -->
     <canvas ref="fxCanvas" class="wp__fx" :class="{ 'is-snow': weather.effect === 'snow' }"></canvas>
 
-    <div class="wp__top">
-      <span class="wp__city">{{ weather.city || '加载中…' }}</span>
-      <div class="wp__actions">
-        <el-tooltip content="定位当前城市" placement="top">
-          <button class="wp__btn" @click="locate">📍</button>
-        </el-tooltip>
-        <el-tooltip content="刷新" placement="top">
-          <button class="wp__btn" :class="{ 'is-spinning': loading }" @click="load">🔄</button>
-        </el-tooltip>
-      </div>
-    </div>
+    <!-- 加载骨架（数据未返回时） -->
+    <el-skeleton v-if="!weather.city" animated class="wp__skeleton">
+      <template #template>
+        <div class="wp__sk-top">
+          <el-skeleton-item variant="text" style="width: 45%; height: 18px" />
+        </div>
+        <div class="wp__sk-main">
+          <el-skeleton-item variant="h3" style="width: 45%; height: 44px" />
+          <el-skeleton-item variant="text" style="width: 30%; height: 14px" />
+        </div>
+        <div class="wp__sk-chips">
+          <el-skeleton-item v-for="n in 5" :key="n" variant="button" style="width: 42px; height: 20px" />
+        </div>
+      </template>
+    </el-skeleton>
 
-    <div class="wp__main">
-      <span class="wp__temp app-num">{{ Math.round(weather.temp ?? 0) }}<small>°C</small></span>
-      <div class="wp__meta">
-        <span class="wp__desc">{{ weather.description || '—' }}</span>
-        <span class="wp__wind">💨 {{ weather.windSpeed ?? 0 }} km/h</span>
+    <template v-else>
+      <div class="wp__top">
+        <span class="wp__city">{{ weather.city }}</span>
+        <div class="wp__actions">
+          <el-tooltip content="定位当前城市" placement="top">
+            <button class="wp__btn" @click="locate">📍</button>
+          </el-tooltip>
+          <el-tooltip content="刷新" placement="top">
+            <button class="wp__btn" :class="{ 'is-spinning': loading }" @click="load">🔄</button>
+          </el-tooltip>
+        </div>
       </div>
-    </div>
 
-    <!-- 常用城市切换 -->
-    <div class="wp__cities">
-      <button
-        v-for="c in cities"
-        :key="c"
-        class="wp__city-chip"
-        :class="{ 'is-active': weather.city === c }"
-        @click="pick(c)"
-      >
-        {{ c }}
-      </button>
-    </div>
+      <div class="wp__main">
+        <span class="wp__temp app-num">{{ Math.round(weather.temp ?? 0) }}<small>°C</small></span>
+        <div class="wp__meta">
+          <span class="wp__desc">{{ weather.description || '—' }}</span>
+          <span class="wp__wind">💨 {{ weather.windSpeed ?? 0 }} km/h</span>
+        </div>
+      </div>
+
+      <!-- 常用城市切换 -->
+      <div class="wp__cities">
+        <button
+          v-for="c in cities"
+          :key="c"
+          class="wp__city-chip"
+          :class="{ 'is-active': weather.city === c }"
+          @click="pick(c)"
+        >
+          {{ c }}
+        </button>
+      </div>
+    </template>
 
     <!-- 顶部装饰云（晴天/多云用） -->
     <div class="wp__deco" aria-hidden="true">
@@ -221,6 +239,32 @@ function startFx() {
   height: 100%;
   pointer-events: none;
   z-index: 1;
+}
+
+/* 加载骨架 */
+.wp__skeleton {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+
+.wp__skeleton :deep(.el-skeleton__item) {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.wp__sk-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wp__sk-chips {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
 }
 
 .wp__top {

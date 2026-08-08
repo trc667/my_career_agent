@@ -6,8 +6,23 @@
       <span class="shop-page__points">我的积分 <b class="app-num">{{ points }}</b></span>
     </div>
 
+    <!-- 商品列表（加载骨架） -->
+    <div v-if="!loaded" class="shop-grid">
+      <el-skeleton v-for="n in 4" :key="n" animated class="shop-card shop-card--sk">
+        <template #template>
+          <div class="shop-sk__head">
+            <el-skeleton-item variant="text" style="width: 70px; height: 18px" />
+            <el-skeleton-item variant="text" style="width: 44px; height: 22px" />
+          </div>
+          <el-skeleton-item variant="h3" style="width: 60%; height: 20px" />
+          <el-skeleton-item variant="text" style="width: 100%; height: 14px" />
+          <el-skeleton-item variant="text" style="width: 85%; height: 14px" />
+        </template>
+      </el-skeleton>
+    </div>
+
     <!-- 商品列表 -->
-    <div class="shop-grid">
+    <div v-else class="shop-grid">
       <div v-for="item in items" :key="item.id" class="shop-card pixel-hover">
         <div class="shop-card__head">
           <span class="shop-card__type" :class="item.type === 'VIP_CARD' ? 'is-vip' : 'is-content'">
@@ -72,6 +87,7 @@ const items = ref<ShopItem[]>([]);
 const records = ref<RedeemRecord[]>([]);
 const points = ref(0);
 const redeemingId = ref(0);
+const loaded = ref(false);
 
 const showDialog = ref(false);
 const dialogTitle = ref('');
@@ -89,6 +105,8 @@ async function loadItems() {
     loadRecords();
   } catch {
     // 拦截器已提示
+  } finally {
+    loaded.value = true;
   }
 }
 
@@ -220,6 +238,18 @@ function formatTime(t?: string) {
   flex-direction: column;
   gap: 10px;
   transition: all 0.18s ease;
+}
+
+.shop-card--sk {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.shop-sk__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .shop-card__head {

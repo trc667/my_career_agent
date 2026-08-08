@@ -6,7 +6,23 @@
       <span v-if="report.week" class="wr-page__week">{{ report.week }}</span>
     </div>
 
-    <div v-if="!loaded" class="wr-loading">周报生成中…</div>
+    <div v-if="!loaded" class="wr-skeleton">
+      <el-skeleton animated class="wr-skeleton__advice">
+        <template #template>
+          <el-skeleton-item variant="text" style="width: 90%; height: 16px" />
+          <el-skeleton-item variant="text" style="width: 60%; height: 16px" />
+        </template>
+      </el-skeleton>
+      <div class="wr-skeleton__grid">
+        <el-skeleton v-for="n in 4" :key="n" animated class="wr-skeleton__card">
+          <template #template>
+            <el-skeleton-item variant="text" style="width: 40%; height: 14px" />
+            <el-skeleton-item variant="h3" style="width: 55%; height: 32px" />
+            <el-skeleton-item variant="text" style="width: 80%; height: 12px" />
+          </template>
+        </el-skeleton>
+      </div>
+    </div>
 
     <template v-else>
       <!-- 周报建议 -->
@@ -151,6 +167,44 @@ onMounted(async () => {
   text-align: center;
   color: var(--app-text-secondary);
   padding: 80px 0;
+}
+
+.wr-skeleton {
+  position: relative;
+  z-index: 2;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wr-skeleton__advice {
+  background: var(--app-card);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wr-skeleton__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--app-space-lg);
+}
+
+.wr-skeleton__card {
+  background: var(--app-card);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-sm);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .wr-advice {
