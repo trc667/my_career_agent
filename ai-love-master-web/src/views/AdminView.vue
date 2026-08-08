@@ -316,7 +316,17 @@ import { getAiAvatar } from '../api/user';
 import type { Notice } from '../api/notice';
 
 const activeTab = ref('announcements');
-const stats = ref<AdminStats | null>(null);
+// 初始化为默认对象避免 null 访问崩溃（接口返回前首帧渲染即安全）
+const stats = ref<AdminStats>({
+  users: { total: 0, newWeek: 0, vip: 0 },
+  activeToday: 0,
+  conversations: { total: 0, week: 0 },
+  weekSignDays: 0,
+  weekCheckinDays: 0,
+  points: { earned: 0, spent: 0 },
+  redeems: { count: 0, points: 0 },
+  spendTop: [],
+});
 const announcements = ref<Notice[]>([]);
 const feedbacks = ref<AdminFeedback[]>([]);
 const users = ref<AdminUser[]>([]);
@@ -350,7 +360,7 @@ function formatTime(t?: string) {
 async function loadStats() {
   try {
     const res = await getAdminStats();
-    stats.value = res.data ?? null;
+    if (res.data) stats.value = res.data;
   } catch {
     // 拦截器已提示
   }
