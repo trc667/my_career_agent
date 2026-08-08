@@ -17,6 +17,7 @@ import com.example.aimaster.service.OssStorageService;
 import com.example.aimaster.service.ErrorLogService;
 import com.example.aimaster.service.KnowledgeService;
 import com.example.aimaster.service.PointService;
+import com.example.aimaster.service.AdminStatsService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,6 +50,7 @@ public class AdminController {
     private final ErrorLogService errorLogService;
     private final KnowledgeService knowledgeService;
     private final PointService pointService;
+    private final AdminStatsService adminStatsService;
 
     public AdminController(AnnouncementMapper announcementMapper,
                            FeedbackMapper feedbackMapper,
@@ -56,7 +58,8 @@ public class AdminController {
                            OssStorageService ossStorageService,
                            ErrorLogService errorLogService,
                            KnowledgeService knowledgeService,
-                           PointService pointService) {
+                           PointService pointService,
+                           AdminStatsService adminStatsService) {
         this.announcementMapper = announcementMapper;
         this.feedbackMapper = feedbackMapper;
         this.userMapper = userMapper;
@@ -64,6 +67,15 @@ public class AdminController {
         this.errorLogService = errorLogService;
         this.knowledgeService = knowledgeService;
         this.pointService = pointService;
+        this.adminStatsService = adminStatsService;
+    }
+
+    /* ===== 运营看板 ===== */
+
+    /** GET /api/admin/stats 运营总览（用户/活跃/对话/积分/兑换/消费去向） */
+    @GetMapping("/stats")
+    public Result<Map<String, Object>> stats() {
+        return Result.ok(adminStatsService.overview());
     }
 
     /* ===== 公告管理 ===== */

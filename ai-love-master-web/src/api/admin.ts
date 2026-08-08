@@ -40,6 +40,22 @@ export interface AdminErrorLog {
   createTime?: string;
 }
 
+/* 运营看板 */
+export interface AdminStats {
+  users: { total: number; newWeek: number; vip: number };
+  activeToday: number;
+  conversations: { total: number; week: number };
+  weekSignDays: number;
+  weekCheckinDays: number;
+  points: { earned: number; spent: number };
+  redeems: { count: number; points: number };
+  spendTop: { reason: string; points: number }[];
+}
+
+export function getAdminStats() {
+  return http.get<any, ResultWrapper<AdminStats>>('/api/admin/stats');
+}
+
 /* 公告管理 */
 export function getAdminAnnouncements() {
   return http.get<any, ResultWrapper<Notice[]>>('/api/admin/announcements');

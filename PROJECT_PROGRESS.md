@@ -54,7 +54,8 @@
 15. **AI 面试模拟**（/interview）：选岗位 → 按 autoTag 分类从知识库抽 5 段知识点（LLM 统一改写成可直接作答的面试问句，失败降级原文）→ 逐题作答 AI 点评打分（RAG 参考要点对照）→ 总结报告（总分/分维度均值/题目明细 + canvas 自绘雷达图）；FREE 每日 2 次、VIP 不限次 + qwen-max 深度点评（4 维度）；会话 Caffeine 缓存 30 分钟（`InterviewService`/`InterviewController`/`InterviewView.vue`）
 16. **积分商城**（/shop）：积分兑换出口（断点①修复）——简历模板/校招时间线/面试高频题 TOP50 资料（30/50/80 分）+ 7 天 VIP 体验卡（200 分）；原子扣分 + point_log 流水 + redeem_record 记录双写审计；VIP 卡兑换即开通，个人中心积分卡片入口（`ShopService`/`ShopController`/`ShopView.vue`）
 17. **用户学习周报**（/weekly-report）：本周（周一起）聚合对话主题/签到/八股打卡/错题/简历评分/积分账本/成就，规则生成建议（零 LLM 成本）；个人中心入口条（`WeeklyReportService`/`GET /api/user/weekly-report`/`WeeklyReportView.vue`）
-18. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
+18. **运营看板**（管理后台 tab）：用户规模（总数/本周新增/VIP）、今日活跃（对话∪签到去重）、对话/签到/八股打卡、本周积分发放消耗、商城兑换统计、积分消耗去向 Top5（`AdminStatsService`/`GET /api/admin/stats`/`AdminView`「运营看板」tab）
+19. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
 
 ## 四、本轮任务进度（已完成并验证）
 
@@ -89,6 +90,7 @@
 | AI 面试模拟（抽题/点评/报告/次数限制 + 首页第 5 卡） | ✅ |
 | 积分商城（兑换出口：资料 + VIP 体验卡，双写审计） | ✅ |
 | 用户学习周报（本周聚合对话/签到/错题/积分 + 建议） | ✅ |
+| 运营看板（用户/活跃/积分消耗统计，管理后台 tab） | ✅ |
 | Git 提交（安全审查通过，分 5 模块 commit；push 待本地执行） | ✅ |
 
 ## 五、量化成果（面试数据）
@@ -123,6 +125,7 @@
 - 面试模拟：`service/InterviewService`（抽题 drawQuestions 分类优先+全库兜底/题目 LLM 改写问句 toInterviewQuestions 降级原文/会话 Caffeine TTL 30min/点评 RAG 参考要点对照/VIP qwen-max 深度 4 维度/FREE 每日 2 次）、`controller/InterviewController`（/api/interview/start|answer|report|quota）、`dto/InterviewStartRequest`+`InterviewAnswerRequest`、前端 `views/InterviewView.vue`+`api/interview.ts`+路由 /interview+首页第 5 卡
 - 积分商城：`service/ShopService`（原子扣分 UPDATE...WHERE points>=cost 防超扣 + point_log/redeem_record 双写 + VIP_CARD 调 grantVip）、`controller/ShopController`（/api/shop/items|redeem|records）、`entity/RedeemItem`+`RedeemRecord`、表 `redeem_item`/`redeem_record`（schema.sql 内置 4 个初始商品）、前端 `views/ShopView.vue`+`api/shop.ts`+路由 /shop+个人中心入口
 - 周报：`service/WeeklyReportService`（本周一 00:00 起聚合 conversation/sign_in/bagu_*/point_log/redeem_record/resume_review + 规则建议）、`GET /api/user/weekly-report`、前端 `views/WeeklyReportView.vue`+路由 /weekly-report+个人中心入口条
+- 运营看板：`service/AdminStatsService`（用户/今日活跃 DISTINCT 去重/积分账本/兑换/消耗去向 Top5）、`GET /api/admin/stats`、前端 `AdminView.vue`「运营看板」tab
 - 知识库：`resources/rag/career-tips.txt`（629 段种子源，仅首次导入用）；`entity/Knowledge` + `mapper/KnowledgeMapper` + `service/KnowledgeService`（DB 事实源，在线增删改查 + 异步全量重建 pgvector/BM25/八股缓存）；表 `knowledge`
 - 知识库管理接口：`controller/AdminController`（/api/admin/knowledge*）+ 前端 `AdminView.vue`「知识库管理」tab + `api/admin.ts`
 - 配置：`application.yml`（公共）、`application-dev.yml`（敏感，不入库）、`application-raggen.yml`（批量生成）
@@ -163,7 +166,7 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - [x] 商业化：分享裂变（邀请码 + 首聊奖励 + 二维码卡片）
 - [x] 商业化：VIP 卖点（AI 面试模拟 FREE 每日 2 次 / VIP 不限次 + qwen-max 深度点评）
 - [x] 商业化：积分商城（兑换出口：简历模板/时间线/高频题 TOP50/7 天 VIP 卡，原子扣分 + 双表审计）
-- [ ] 商业化：运营看板（断点③：管理后台用户活跃/留存/积分消耗统计，当前只有错误监控）
+- [x] 商业化：运营看板（管理后台用户活跃/留存/积分消耗统计 + 消耗去向 Top）
 - [x] 商业化：用户学习周报（断点②：每周汇总对话主题/错题进步/连续签到/成就解锁，数据资产沉淀）
 
 ### P3 暂缓/锦上添花

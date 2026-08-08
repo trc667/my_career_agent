@@ -7,6 +7,58 @@
 
     <main class="admin-page__body">
       <el-tabs v-model="activeTab" class="admin-tabs">
+        <!-- 运营看板 -->
+        <el-tab-pane label="运营看板" name="stats">
+          <div class="stats-grid">
+            <div class="stats-card">
+              <span class="stats-card__label">注册用户</span>
+              <span class="stats-card__value app-num">{{ stats.users?.total ?? 0 }}</span>
+              <span class="stats-card__sub">本周新增 {{ stats.users?.newWeek ?? 0 }}</span>
+            </div>
+            <div class="stats-card">
+              <span class="stats-card__label">今日活跃</span>
+              <span class="stats-card__value app-num">{{ stats.activeToday ?? 0 }}</span>
+              <span class="stats-card__sub">有对话或签到的用户</span>
+            </div>
+            <div class="stats-card">
+              <span class="stats-card__label">VIP 用户</span>
+              <span class="stats-card__value app-num">{{ stats.users?.vip ?? 0 }}</span>
+              <span class="stats-card__sub">付费转化基础盘</span>
+            </div>
+            <div class="stats-card">
+              <span class="stats-card__label">累计对话</span>
+              <span class="stats-card__value app-num">{{ stats.conversations?.total ?? 0 }}</span>
+              <span class="stats-card__sub">本周 {{ stats.conversations?.week ?? 0 }} 次</span>
+            </div>
+            <div class="stats-card">
+              <span class="stats-card__label">本周签到</span>
+              <span class="stats-card__value app-num">{{ stats.weekSignDays ?? 0 }}</span>
+              <span class="stats-card__sub">人次 · 八股打卡 {{ stats.weekCheckinDays ?? 0 }}</span>
+            </div>
+            <div class="stats-card">
+              <span class="stats-card__label">本周积分</span>
+              <span class="stats-card__value app-num">+{{ stats.points?.earned ?? 0 }}</span>
+              <span class="stats-card__sub">发放 {{ stats.points?.earned ?? 0 }} / 消耗 {{ stats.points?.spent ?? 0 }}</span>
+            </div>
+            <div class="stats-card">
+              <span class="stats-card__label">商城兑换</span>
+              <span class="stats-card__value app-num">{{ stats.redeems?.count ?? 0 }}</span>
+              <span class="stats-card__sub">累计消耗 {{ stats.redeems?.points ?? 0 }} 积分</span>
+            </div>
+            <div class="stats-card stats-card--wide">
+              <span class="stats-card__label">本周积分消耗去向</span>
+              <div v-if="stats.spendTop?.length" class="stats-top">
+                <div v-for="(s, i) in stats.spendTop" :key="i" class="stats-top__row">
+                  <span class="stats-top__reason">{{ s.reason }}</span>
+                  <el-progress :percentage="Math.round((s.points / (stats.points?.spent || 1)) * 100)" :stroke-width="6" color="#2f6bff" />
+                  <span class="stats-top__points app-num">{{ s.points }}</span>
+                </div>
+              </div>
+              <span v-else class="stats-card__sub">本周暂无积分消耗</span>
+            </div>
+          </div>
+        </el-tab-pane>
+
         <!-- 公告管理 -->
         <el-tab-pane label="公告管理" name="announcements">
           <div class="admin-toolbar">
@@ -243,6 +295,9 @@ import {
   getAdminErrorLogs,
   getAdminFeedbacks,
   getAdminKnowledge,
+  getAdminStats,
+  type AdminStats,
+
   getAdminUsers,
   getKnowledgeCategories,
   getKnowledgeRebuildStatus,
@@ -261,6 +316,7 @@ import { getAiAvatar } from '../api/user';
 import type { Notice } from '../api/notice';
 
 const activeTab = ref('announcements');
+const stats = ref<AdminStats | null>(null);
 const announcements = ref<Notice[]>([]);
 const feedbacks = ref<AdminFeedback[]>([]);
 const users = ref<AdminUser[]>([]);
@@ -289,6 +345,15 @@ const kbRebuild = reactive({ rebuilding: false, status: 'idle', info: '' });
 function formatTime(t?: string) {
   if (!t) return '';
   return String(t).slice(0, 19).replace('T', ' ');
+}
+
+async function loadStats() {
+  try {
+    const res = await getAdminStats();
+    stats.value = res.data ?? null;
+  } catch {
+    // 拦截器已提示
+  }
 }
 
 async function loadAll() {
@@ -514,6 +579,7 @@ onMounted(() => {
   loadErrorLogs();
   loadKnowledge();
   loadKbMeta();
+  loadStats();
 });
 </script>
 
@@ -570,6 +636,73 @@ onMounted(() => {
 
 .admin-toolbar {
   margin-bottom: var(--app-space-md);
+}
+
+/* 运营看板 */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--app-space-md);
+}
+
+.stats-card {
+  background: var(--app-card);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  box-shadow: var(--app-shadow-sm);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stats-card--wide {
+  grid-column: 1 / -1;
+}
+
+.stats-card__label {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+  font-weight: 600;
+}
+
+.stats-card__value {
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--app-primary);
+  line-height: 1.1;
+}
+
+.stats-card__sub {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+
+.stats-top {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.stats-top__row {
+  display: grid;
+  grid-template-columns: 200px 1fr 50px;
+  align-items: center;
+  gap: 12px;
+}
+
+.stats-top__reason {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-top__points {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
 }
 
 .admin-empty {
