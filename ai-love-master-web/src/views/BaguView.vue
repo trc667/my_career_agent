@@ -2,7 +2,7 @@
   <div class="bagu-page">
     <div class="bagu-page__bar">
       <router-link to="/" class="bagu-page__back">← 返回首页</router-link>
-      <h1 class="bagu-page__title">AI 八股练习场</h1>
+      <h1 class="bagu-page__title">八股练习场</h1>
     </div>
 
     <main class="bagu-page__body">

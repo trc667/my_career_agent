@@ -2,7 +2,7 @@
   <div class="iv-page">
     <div class="iv-page__bar">
       <router-link to="/" class="iv-page__back">← 返回首页</router-link>
-      <h1 class="iv-page__title">AI 面试模拟</h1>
+      <h1 class="iv-page__title">面试模拟</h1>
       <span v-if="quota.vip" class="iv-page__quota">👑 VIP 不限次</span>
       <span v-else class="iv-page__quota">今日剩余 <b class="app-num">{{ quota.quotaLeft }}</b>/{{ quota.dailyLimit }} 次</span>
     </div>

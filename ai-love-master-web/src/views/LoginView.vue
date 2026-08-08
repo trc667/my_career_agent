@@ -7,7 +7,7 @@
     <div class="auth-card">
       <div class="auth-card__logo">AI</div>
       <h1 class="auth-title">登录</h1>
-      <p class="auth-desc">登录后使用 AI 职规大师、超级智能体等功能</p>
+      <p class="auth-desc">登录后使用职规大师、超级智能体等功能</p>
       <el-form
         ref="formRef"
         :model="form"

@@ -145,12 +145,12 @@
         <div class="app-card__inner">
           <div class="app-card__face app-card__face--front">
             <div class="app-card__icon"><PixelIcon name="briefcase" :size="52" /></div>
-            <h3 class="app-card__name">AI 职规大师</h3>
+            <h3 class="app-card__name">职规大师</h3>
             <p class="app-card__desc">不懂怎么规划职业？<br />简历、面试、校招随时问</p>
             <span class="app-card__hint">悬停看看能帮你做什么 →</span>
           </div>
           <div class="app-card__face app-card__face--back">
-            <h3 class="app-card__back-title">AI 职规大师</h3>
+            <h3 class="app-card__back-title">职规大师</h3>
             <ul class="app-card__features">
               <li>帮你定方向，不再迷茫</li>
               <li>教你写简历、过面试</li>
@@ -171,12 +171,12 @@
         <div class="app-card__inner">
           <div class="app-card__face app-card__face--front">
             <div class="app-card__icon"><PixelIcon name="cpu" :size="52" /></div>
-            <h3 class="app-card__name">AI 超级智能体</h3>
+            <h3 class="app-card__name">超级智能体</h3>
             <p class="app-card__desc">一个任务，AI 帮你跑完<br />查资料、找地点、出 PDF 一条龙</p>
             <span class="app-card__hint">悬停看看能帮你做什么 →</span>
           </div>
           <div class="app-card__face app-card__face--back">
-            <h3 class="app-card__back-title">AI 超级智能体</h3>
+            <h3 class="app-card__back-title">超级智能体</h3>
             <ul class="app-card__features">
               <li>帮我查附近图书馆</li>
               <li>上网搜最新资料</li>
@@ -197,12 +197,12 @@
         <div class="app-card__inner">
           <div class="app-card__face app-card__face--front">
             <div class="app-card__icon"><PixelIcon name="book-open" :size="52" /></div>
-            <h3 class="app-card__name">AI 八股练习场</h3>
+            <h3 class="app-card__name">八股练习场</h3>
             <p class="app-card__desc">面试八股随便刷<br />按主题速览 + 随机抽题</p>
             <span class="app-card__hint">悬停看看能帮你做什么 →</span>
           </div>
           <div class="app-card__face app-card__face--back">
-            <h3 class="app-card__back-title">AI 八股练习场</h3>
+            <h3 class="app-card__back-title">八股练习场</h3>
             <ul class="app-card__features">
               <li>按主题刷八股，不怕问</li>
               <li>不会的搜一下就有</li>
@@ -223,12 +223,12 @@
         <div class="app-card__inner">
           <div class="app-card__face app-card__face--front">
             <div class="app-card__icon"><PixelIcon name="card-text" :size="52" /></div>
-            <h3 class="app-card__name">AI 简历评分</h3>
+            <h3 class="app-card__name">简历评分</h3>
             <p class="app-card__desc">简历行不行？AI 帮你把关<br />分维度打分 + 优化版简历</p>
             <span class="app-card__hint">悬停看看能帮你做什么 →</span>
           </div>
           <div class="app-card__face app-card__face--back">
-            <h3 class="app-card__back-title">AI 简历评分</h3>
+            <h3 class="app-card__back-title">简历评分</h3>
             <ul class="app-card__features">
               <li>6 大维度量化打分</li>
               <li>项目经历深度诊断</li>
@@ -249,12 +249,12 @@
         <div class="app-card__inner">
           <div class="app-card__face app-card__face--front">
             <div class="app-card__icon"><PixelIcon name="comment" :size="52" /></div>
-            <h3 class="app-card__name">AI 面试模拟</h3>
+            <h3 class="app-card__name">面试模拟</h3>
             <p class="app-card__desc">AI 面试官按岗位出 5 题<br />逐题点评 + 总结报告</p>
             <span class="app-card__hint">悬停看看能帮你做什么 →</span>
           </div>
           <div class="app-card__face app-card__face--back">
-            <h3 class="app-card__back-title">AI 面试模拟</h3>
+            <h3 class="app-card__back-title">面试模拟</h3>
             <ul class="app-card__features">
               <li>按岗位抽题，5 题一轮</li>
               <li>作答后 AI 实时点评打分</li>

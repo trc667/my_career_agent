@@ -23,7 +23,7 @@
             <el-icon><Menu /></el-icon>
           </el-button>
           <router-link to="/" class="chat-header__back">← 返回</router-link>
-          <div class="chat-header__title">AI 超级智能体</div>
+          <div class="chat-header__title">超级智能体</div>
         </div>
         <div class="chat-header__right">
           <el-avatar :size="32" :src="authStore.avatar || undefined">{{ authStore.avatar ? '' : (authStore.username || '我')[0] }}</el-avatar>

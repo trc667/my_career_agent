@@ -1,5 +1,5 @@
 /**
- * AI 面试模拟 API
+ * 面试模拟 API
  */
 import http from './http';
 import type { ResultWrapper } from './chat';

@@ -2,7 +2,7 @@
   <div class="resume-page" :class="`theme-${theme}`">
     <div class="resume-page__bar">
       <router-link to="/" class="resume-page__back">← 返回首页</router-link>
-      <div class="resume-page__title">📄 AI 简历评分</div>
+      <div class="resume-page__title">📄 简历评分</div>
     </div>
 
     <div class="resume-layout">
