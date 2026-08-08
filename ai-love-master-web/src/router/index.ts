@@ -18,6 +18,7 @@ const router = createRouter({
     { path: '/admin', name: 'admin', component: () => import('../views/AdminView.vue'), meta: { title: '管理后台', requiresAuth: true, requiresAdmin: true } },
     { path: '/bagu', name: 'bagu', component: () => import('../views/BaguView.vue'), meta: { title: 'AI 八股练习场', requiresAuth: true } },
     { path: '/bagu-practice', name: 'bagu-practice', component: () => import('../views/BaguPracticeView.vue'), meta: { title: '学习记录', requiresAuth: true } },
+    { path: '/interview', name: 'interview', component: () => import('../views/InterviewView.vue'), meta: { title: 'AI 面试模拟', requiresAuth: true } },
   ],
 });
 

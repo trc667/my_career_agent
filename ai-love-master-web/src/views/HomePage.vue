@@ -75,6 +75,46 @@
         </span>
       </div>
 
+      <!-- 数据统计卡片（商用仪表盘，参考工作台排版） -->
+      <div v-if="authStore.isAuthenticated()" class="home__stats">
+        <div class="home__stat">
+          <span class="home__stat-icon">⚡</span>
+          <div class="home__stat-body">
+            <span class="home__stat-num app-num">{{ displayedPoints }}</span>
+            <span class="home__stat-label">积分余额</span>
+          </div>
+        </div>
+        <div class="home__stat">
+          <span class="home__stat-icon">📅</span>
+          <div class="home__stat-body">
+            <span class="home__stat-num app-num">{{ streakDays }}</span>
+            <span class="home__stat-label">连续签到 · 天</span>
+          </div>
+        </div>
+        <div class="home__stat">
+          <span class="home__stat-icon">👑</span>
+          <div class="home__stat-body">
+            <span class="home__stat-num">{{ level === 'VIP' ? 'VIP' : 'FREE' }}</span>
+            <span class="home__stat-label">会员等级</span>
+          </div>
+        </div>
+        <div class="home__stat">
+          <span class="home__stat-icon">🎁</span>
+          <div class="home__stat-body">
+            <span class="home__stat-num app-num">{{ invitedCount }}</span>
+            <span class="home__stat-label">已邀请好友</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 签到周期进度（7 天解锁 +10） -->
+      <div v-if="authStore.isAuthenticated() && streakDays > 0" class="home__streak">
+        <span class="home__streak-text">
+          签到周期 <b class="app-num">{{ streakInCycle }}/7</b> 天 · 再签 <b class="app-num">{{ remainToBonus }}</b> 天解锁 +10
+        </span>
+        <el-progress :percentage="streakPct" :stroke-width="6" :show-text="false" color="#2f6bff" class="home__streak-bar" />
+      </div>
+
       <!-- 多引擎搜索框 -->
       <div class="home__search">
         <el-select v-model="searchEngine" size="large" class="home__search-engine">
@@ -199,6 +239,32 @@
           </div>
         </div>
       </div>
+
+      <div
+        class="app-card pixel-hover"
+        @click="goToApp('/interview')"
+        @mousemove="onCardMove($event, $event.currentTarget as HTMLElement)"
+        @mouseleave="onCardLeave($event.currentTarget as HTMLElement)"
+      >
+        <div class="app-card__inner">
+          <div class="app-card__face app-card__face--front">
+            <div class="app-card__icon"><PixelIcon name="comment" :size="52" /></div>
+            <h3 class="app-card__name">AI 面试模拟</h3>
+            <p class="app-card__desc">AI 面试官按岗位出 5 题<br />逐题点评 + 总结报告</p>
+            <span class="app-card__hint">悬停看看能帮你做什么 →</span>
+          </div>
+          <div class="app-card__face app-card__face--back">
+            <h3 class="app-card__back-title">AI 面试模拟</h3>
+            <ul class="app-card__features">
+              <li>按岗位抽题，5 题一轮</li>
+              <li>作答后 AI 实时点评打分</li>
+              <li>三维度评分 + 参考要点</li>
+              <li>总结报告看整体水平</li>
+            </ul>
+            <span class="app-card__go">去面试 →</span>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- 背景装饰：柔和光斑 + 漂浮圆点 + 像素云/星 -->
@@ -212,12 +278,11 @@
         class="home__dot"
         :style="dotStyle(n)"
       />
-      <span class="pixel-cloud home__pixel home__pixel--cloud1" />
-      <span class="pixel-cloud home__pixel home__pixel--cloud2" />
-      <span class="pixel-star home__pixel home__pixel--star1" />
-      <span class="pixel-star home__pixel home__pixel--star2" />
-      <span class="pixel-star home__pixel home__pixel--star3" />
-      <span class="pixel-block home__pixel home__pixel--block1" />
+      <!-- 背景装饰 -->
+      <div class="home-page__bg" aria-hidden="true">
+        <span class="app-orb app-orb--blue home-orb home-orb--1" />
+        <span class="app-orb app-orb--purple home-orb home-orb--2" />
+      </div>
     </div>
 
     <!-- 最新公告弹窗 -->
@@ -257,7 +322,8 @@ import { ArrowDown } from '@element-plus/icons-vue';
 import PixelIcon from '../components/PixelIcon.vue';
 import { useAuthStore } from '../store/authStore';
 import { getLatestNotice, type Notice } from '../api/notice';
-import { getPoints, signIn } from '../api/user';
+import { getInvite, getPoints, signIn } from '../api/user';
+import { useCountUp } from '../composables/useCountUp';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -268,6 +334,16 @@ const level = ref('FREE');
 const signedToday = ref(false);
 const streakDays = ref(0);
 const signing = ref(false);
+const invitedCount = ref(0);
+
+/* 积分数字滚动 + 签到 7 天周期进度 */
+const displayedPoints = useCountUp(computed(() => points.value));
+const streakInCycle = computed(() => {
+  const d = streakDays.value % 7;
+  return d === 0 ? 7 : d;
+});
+const remainToBonus = computed(() => 7 - streakInCycle.value);
+const streakPct = computed(() => Math.round((streakInCycle.value / 7) * 100));
 
 /** 加载积分画像（登录时） */
 async function loadPoints() {
@@ -278,6 +354,17 @@ async function loadPoints() {
     level.value = res.data?.level ?? 'FREE';
     signedToday.value = !!res.data?.signedToday;
     streakDays.value = res.data?.streakDays ?? 0;
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+/** 加载邀请数据（首页统计卡） */
+async function loadInviteCount() {
+  if (!authStore.isAuthenticated()) return;
+  try {
+    const res = await getInvite();
+    invitedCount.value = res.data?.invitedCount ?? 0;
   } catch {
     // 拦截器已提示
   }
@@ -525,6 +612,7 @@ onMounted(() => {
   if (authStore.isAuthenticated()) {
     authStore.fetchAvatar();
     loadPoints();
+    loadInviteCount();
   }
 });
 onBeforeUnmount(() => {
@@ -555,13 +643,94 @@ function dotStyle(n: number) {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(165deg, #f6f8fb 0%, #eef2f7 45%, #e6ebf2 100%);
+  background: linear-gradient(180deg, #f8fbfe 0%, #f0f4fa 55%, #eaf0f8 100%);
   color: var(--app-text);
   padding: 0 var(--app-space-xl);
 }
 
 .theme-dark .home {
   background: linear-gradient(165deg, #14171c 0%, #101318 50%, #0d1014 100%);
+}
+
+/* ===== 数据统计卡片（商用仪表盘） ===== */
+.home__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--app-space-md);
+  max-width: 720px;
+  margin: 24px auto 0;
+}
+
+.home__stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  background: var(--app-card);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  box-shadow: var(--app-shadow-sm);
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.home__stat:hover {
+  box-shadow: var(--app-shadow-md);
+  transform: translateY(-2px);
+}
+
+.home__stat-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.home__stat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.home__stat-num {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--app-text);
+  line-height: 1.1;
+}
+
+.home__stat-label {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+
+/* 签到周期进度条 */
+.home__streak {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  max-width: 720px;
+  margin: 16px auto 0;
+  padding: 10px 18px;
+  background: var(--app-card);
+  border: 1px solid var(--app-border);
+  border-radius: 9999px;
+  box-shadow: var(--app-shadow-sm);
+  flex-wrap: wrap;
+}
+
+.home__streak-text {
+  font-size: 13px;
+  color: var(--app-text-secondary);
+  white-space: nowrap;
+}
+
+.home__streak-text b {
+  color: var(--app-primary);
+}
+
+.home__streak-bar {
+  flex: 1;
+  min-width: 140px;
 }
 
 /* ===== 顶部导航 ===== */
@@ -587,14 +756,14 @@ function dotStyle(n: number) {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #409eff, #5db2ff);
+  background: linear-gradient(135deg, #4a8bff, #2f6bff);
   color: #fff;
   font-weight: 800;
   font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 14px rgba(64, 158, 255, 0.35);
+  box-shadow: 0 4px 14px rgba(47, 107, 255, 0.32);
 }
 
 .home__brand-name {
@@ -762,8 +931,8 @@ function dotStyle(n: number) {
   margin: 0 0 var(--app-space-md);
   font-size: clamp(30px, 5vw, 46px);
   font-weight: 800;
-  letter-spacing: 2px;
-  background: linear-gradient(120deg, #409eff, #5db2ff 50%, #7ec3ff);
+  letter-spacing: 1px;
+  background: linear-gradient(120deg, #2f6bff, #4a8bff 50%, #6fa3ff);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -878,16 +1047,22 @@ function dotStyle(n: number) {
   width: 100%;
   height: 300px;
   transform-style: preserve-3d;
-  transition: transform 0.65s cubic-bezier(0.4, 0.2, 0.2, 1);
+  transition: transform 0.35s ease;
   border-radius: var(--app-radius-lg);
 }
 
+/* 商用风：hover 上浮而非 3D 翻转 */
 .app-card:hover .app-card__inner {
-  transform: rotateY(180deg);
+  transform: translateY(-4px);
+}
+
+.app-card:hover .app-card__face--front {
+  box-shadow: var(--app-shadow-lg);
+  border-color: rgba(47, 107, 255, 0.22);
 }
 
 .app-card:active .app-card__inner {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 
 .app-card__face {
@@ -908,8 +1083,14 @@ function dotStyle(n: number) {
 
 /* 正面：浅色信息卡 */
 .app-card__face--front {
-  background: var(--app-card);
+  background: linear-gradient(165deg, #ffffff, #f7faff);
   border: 1px solid var(--app-border);
+  box-shadow: var(--app-shadow-sm);
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.theme-dark .app-card__face--front {
+  background: linear-gradient(165deg, #18202f, #151b28);
 }
 
 .app-card__icon {
@@ -1066,54 +1247,27 @@ function dotStyle(n: number) {
 }
 
 /* ===== 像素风点缀 ===== */
-/* 品牌 logo：像素方块 + 硬阴影 */
+/* 品牌 logo：主色渐变圆角方块（商用风） */
 .home__brand-logo {
-  border-radius: 4px;
-  box-shadow: 3px 3px 0 rgba(64, 158, 255, 0.6);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(47, 107, 255, 0.28);
   letter-spacing: 0;
 }
 
-/* 背景像素装饰定位 */
-.home__pixel {
-  z-index: 1;
+/* 背景柔和光斑定位（商用风） */
+.home-orb--1 {
+  width: 380px;
+  height: 380px;
+  top: -120px;
+  right: -100px;
 }
 
-.home__pixel--cloud1 {
-  top: 14%;
-  left: 6%;
-  opacity: 0.35;
-}
-
-.home__pixel--cloud2 {
-  top: 20%;
-  right: 8%;
-  opacity: 0.3;
-  animation-delay: 2.5s;
-  transform: scale(0.8);
-}
-
-.home__pixel--star1 {
-  top: 12%;
-  right: 24%;
-}
-
-.home__pixel--star2 {
-  top: 34%;
-  left: 14%;
-  animation-delay: 1.6s;
-  transform: scale(0.7);
-}
-
-.home__pixel--star3 {
-  bottom: 18%;
-  right: 16%;
-  animation-delay: 3s;
-}
-
-.home__pixel--block1 {
-  top: 48%;
-  right: 5%;
-  transform: scale(0.9);
+.home-orb--2 {
+  width: 320px;
+  height: 320px;
+  bottom: -80px;
+  left: -100px;
+  animation-delay: 2s;
 }
 
 /* 像素图标不再需要柔光阴影 */
