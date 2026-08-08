@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.aimaster.entity.Conversation;
+import com.example.aimaster.entity.InterviewRecord;
 import com.example.aimaster.entity.PointLog;
 import com.example.aimaster.entity.RedeemRecord;
 import com.example.aimaster.entity.ResumeReview;
@@ -20,6 +21,7 @@ import com.example.aimaster.entity.BaguWrong;
 import com.example.aimaster.mapper.BaguCheckinMapper;
 import com.example.aimaster.mapper.BaguWrongMapper;
 import com.example.aimaster.mapper.ConversationMapper;
+import com.example.aimaster.mapper.InterviewRecordMapper;
 import com.example.aimaster.mapper.PointLogMapper;
 import com.example.aimaster.mapper.RedeemRecordMapper;
 import com.example.aimaster.mapper.ResumeReviewMapper;
@@ -44,11 +46,13 @@ public class WeeklyReportService {
     private final RedeemRecordMapper redeemRecordMapper;
     private final ResumeReviewMapper resumeReviewMapper;
     private final AchievementService achievementService;
+    private final InterviewRecordMapper interviewRecordMapper;
 
     public WeeklyReportService(ConversationMapper conversationMapper, SignInMapper signInMapper,
                                BaguCheckinMapper baguCheckinMapper, BaguWrongMapper baguWrongMapper,
                                PointLogMapper pointLogMapper, RedeemRecordMapper redeemRecordMapper,
-                               ResumeReviewMapper resumeReviewMapper, AchievementService achievementService) {
+                               ResumeReviewMapper resumeReviewMapper, AchievementService achievementService,
+                               InterviewRecordMapper interviewRecordMapper) {
         this.conversationMapper = conversationMapper;
         this.signInMapper = signInMapper;
         this.baguCheckinMapper = baguCheckinMapper;
@@ -57,6 +61,7 @@ public class WeeklyReportService {
         this.redeemRecordMapper = redeemRecordMapper;
         this.resumeReviewMapper = resumeReviewMapper;
         this.achievementService = achievementService;
+        this.interviewRecordMapper = interviewRecordMapper;
     }
 
     /** 生成本周学习周报（本周一 00:00 起聚合） */
@@ -96,11 +101,14 @@ public class WeeklyReportService {
         learning.put("masteredWrong", masteredWrong);
         report.put("learning", learning);
 
-        // 求职产出：简历评分次数
+        // 求职产出：简历评分次数 + 面试场次
         long resumeReviews = resumeReviewMapper.selectCount(new LambdaQueryWrapper<ResumeReview>()
                 .eq(ResumeReview::getUserId, userId).ge(ResumeReview::getCreateTime, start));
+        long interviews = interviewRecordMapper.selectCount(new LambdaQueryWrapper<InterviewRecord>()
+                .eq(InterviewRecord::getUserId, userId).ge(InterviewRecord::getCreateTime, start));
         Map<String, Object> output = new LinkedHashMap<>();
         output.put("resumeReviews", resumeReviews);
+        output.put("interviews", interviews);
         report.put("output", output);
 
         // 积分：本周获得/消耗/净变化/兑换次数

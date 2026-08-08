@@ -1,0 +1,383 @@
+<template>
+  <div class="ir-page">
+    <div class="ir-page__bar">
+      <router-link to="/user-center" class="ir-page__back">← 返回个人中心</router-link>
+      <h1 class="ir-page__title">面试记录</h1>
+      <router-link to="/interview" class="ir-page__new">+ 开始新面试</router-link>
+    </div>
+
+    <div v-if="!loaded" class="ir-loading">加载中…</div>
+
+    <div v-else-if="!records.length" class="ir-empty">
+      <p class="ir-empty__icon">🎯</p>
+      <p class="ir-empty__text">还没有面试记录，去面试模拟来一场吧！</p>
+      <router-link to="/interview"><el-button type="primary" round>开始面试</el-button></router-link>
+    </div>
+
+    <div v-else class="ir-list">
+      <div v-for="r in records" :key="r.id" class="ir-card" @click="openDetail(r)">
+        <div class="ir-card__head">
+          <div class="ir-card__left">
+            <span class="ir-card__position">{{ r.position }}岗</span>
+            <span class="ir-card__time">{{ formatTime(r.createdAt) }}</span>
+          </div>
+          <span class="ir-card__score app-num" :class="scoreClass(r.totalScore)">{{ r.totalScore }}</span>
+        </div>
+        <div v-if="r.dimensions?.length" class="ir-card__dims">
+          <div v-for="d in r.dimensions" :key="d.name" class="ir-card__dim">
+            <span class="ir-card__dim-name">{{ d.name }}</span>
+            <el-progress :percentage="d.score" :stroke-width="5" color="#2f6bff" />
+            <span class="ir-card__dim-score app-num">{{ d.score }}</span>
+          </div>
+        </div>
+        <span class="ir-card__more">查看逐题点评 →</span>
+      </div>
+    </div>
+
+    <!-- 详情弹窗 -->
+    <el-dialog v-model="showDetail" :title="detailTitle" width="min(560px, 94vw)" align-center>
+      <div v-if="detail" class="ir-detail">
+        <div class="ir-detail__head">
+          <span class="ir-detail__label">{{ detail.position }}岗 · 面试总分</span>
+          <span class="ir-detail__score app-num" :class="scoreClass(detail.totalScore)">{{ detail.totalScore }}</span>
+        </div>
+        <div v-for="(it, i) in detail.items" :key="i" class="ir-detail__item">
+          <div class="ir-detail__q">
+            <span class="ir-detail__q-no">{{ i + 1 }}</span>
+            <span class="ir-detail__q-text">{{ it.question }}</span>
+            <span class="ir-detail__q-score app-num" :class="scoreClass(it.score)">{{ it.score }}</span>
+          </div>
+          <p class="ir-detail__comment">{{ it.comment }}</p>
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- 背景装饰 -->
+    <div class="ir-page__bg" aria-hidden="true">
+      <span class="app-orb app-orb--blue ir-orb ir-orb--1" />
+      <span class="app-orb app-orb--purple ir-orb ir-orb--2" />
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue';
+import { ElMessage } from 'element-plus';
+import {
+  getInterviewRecordDetail,
+  getInterviewRecords,
+  type InterviewRecordDetail,
+  type InterviewRecordItem,
+} from '../api/interview';
+
+const records = ref<InterviewRecordItem[]>([]);
+const loaded = ref(false);
+const showDetail = ref(false);
+const detail = ref<InterviewRecordDetail | null>(null);
+const detailTitle = computed(() => (detail.value ? `${detail.value.position}岗 · 面试详情` : '面试详情'));
+
+onMounted(loadRecords);
+
+async function loadRecords() {
+  try {
+    const res = await getInterviewRecords();
+    records.value = res.data ?? [];
+  } catch {
+    // 拦截器已提示
+  } finally {
+    loaded.value = true;
+  }
+}
+
+async function openDetail(r: InterviewRecordItem) {
+  try {
+    const res = await getInterviewRecordDetail(r.id);
+    detail.value = res.data ?? null;
+    showDetail.value = true;
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+function scoreClass(s: number) {
+  return s >= 75 ? 'is-good' : s >= 60 ? 'is-mid' : 'is-low';
+}
+
+function formatTime(t?: string) {
+  if (!t) return '';
+  return t.replace('T', ' ').slice(0, 16);
+}
+</script>
+
+<style scoped>
+.ir-page {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #f8fbfe 0%, #f0f4fa 55%, #eaf0f8 100%);
+  color: var(--app-text);
+  padding: 0 var(--app-space-xl) 60px;
+}
+
+.theme-dark .ir-page {
+  background: linear-gradient(180deg, #10141c 0%, #0d1118 55%, #0a0e14 100%);
+}
+
+.ir-page__bar {
+  position: relative;
+  z-index: 2;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--app-space-lg) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-lg);
+  flex-wrap: wrap;
+}
+
+.ir-page__back {
+  font-size: 14px;
+  color: var(--app-primary);
+  text-decoration: none;
+}
+
+.ir-page__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  flex: 1;
+}
+
+.ir-page__new {
+  font-size: 13px;
+  color: var(--app-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ir-loading {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  color: var(--app-text-secondary);
+  padding: 80px 0;
+}
+
+.ir-empty {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 70px 0;
+  color: var(--app-text-secondary);
+}
+
+.ir-empty__icon {
+  font-size: 42px;
+  margin: 0 0 10px;
+}
+
+.ir-empty__text {
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+
+.ir-list {
+  position: relative;
+  z-index: 2;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ir-card {
+  background: var(--app-card);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-md);
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  animation: app-fade-up 0.5s ease both;
+}
+
+.ir-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--app-shadow-lg);
+}
+
+.ir-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.ir-card__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ir-card__position {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--app-primary);
+  background: var(--app-primary-soft);
+  padding: 2px 10px;
+  border-radius: 9999px;
+}
+
+.ir-card__time {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+
+.ir-card__score {
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.ir-card__score.is-good { color: #16a34a; }
+.ir-card__score.is-mid { color: #f59e0b; }
+.ir-card__score.is-low { color: #ef4444; }
+
+.ir-card__dims {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ir-card__dim {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ir-card__dim-name {
+  width: 64px;
+  font-size: 12px;
+  color: var(--app-text-secondary);
+  flex-shrink: 0;
+}
+
+.ir-card__dim .el-progress {
+  flex: 1;
+}
+
+.ir-card__dim-score {
+  width: 30px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.ir-card__more {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--app-primary);
+  text-align: right;
+}
+
+.ir-detail__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.ir-detail__label {
+  font-size: 13px;
+  color: var(--app-text-secondary);
+}
+
+.ir-detail__score {
+  font-size: 34px;
+  font-weight: 800;
+}
+
+.ir-detail__score.is-good { color: #16a34a; }
+.ir-detail__score.is-mid { color: #f59e0b; }
+.ir-detail__score.is-low { color: #ef4444; }
+
+.ir-detail__item {
+  border-top: 1px solid var(--app-border);
+  padding: 12px 0;
+}
+
+.ir-detail__q {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.ir-detail__q-no {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--app-primary);
+  color: #fff;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ir-detail__q-text {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.ir-detail__q-score {
+  font-size: 18px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.ir-detail__q-score.is-good { color: #16a34a; }
+.ir-detail__q-score.is-mid { color: #f59e0b; }
+.ir-detail__q-score.is-low { color: #ef4444; }
+
+.ir-detail__comment {
+  margin: 6px 0 0 30px;
+  font-size: 13px;
+  color: var(--app-text-secondary);
+  line-height: 1.7;
+}
+
+.ir-page__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.ir-orb--1 {
+  width: 380px;
+  height: 380px;
+  top: -120px;
+  right: -100px;
+}
+
+.ir-orb--2 {
+  width: 320px;
+  height: 320px;
+  bottom: -80px;
+  left: -100px;
+  animation-delay: 2s;
+}
+
+@media (max-width: 767px) {
+  .ir-page {
+    padding: 0 var(--app-space-md) 40px;
+  }
+}
+</style>

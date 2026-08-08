@@ -61,3 +61,27 @@ export function getInterviewReport(sessionId: string) {
 export function getInterviewQuota() {
   return http.get<any, ResultWrapper<InterviewQuota>>('/api/interview/quota');
 }
+
+/** 面试记录条目（列表） */
+export interface InterviewRecordItem {
+  id: number;
+  position: string;
+  totalScore: number;
+  dimensions: { name: string; score: number }[];
+  createdAt: string;
+}
+
+/** 面试记录详情（含逐题明细） */
+export interface InterviewRecordDetail extends InterviewRecordItem {
+  items: { question: string; score: number; comment: string }[];
+}
+
+/** 我的面试记录列表 */
+export function getInterviewRecords() {
+  return http.get<any, ResultWrapper<InterviewRecordItem[]>>('/api/interview/records');
+}
+
+/** 单场面试详情 */
+export function getInterviewRecordDetail(id: number) {
+  return http.get<any, ResultWrapper<InterviewRecordDetail>>(`/api/interview/records/${id}`);
+}

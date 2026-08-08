@@ -12,6 +12,7 @@ import com.example.aimaster.service.InterviewService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -75,5 +76,21 @@ public class InterviewController {
         Long userId = currentUserId();
         if (userId == null) return Result.fail(401, "未登录或账号不存在");
         return Result.ok(interviewService.quota(userId));
+    }
+
+    /** GET /api/interview/records 我的面试记录列表（完成即落库） */
+    @GetMapping("/records")
+    public Result<java.util.List<Map<String, Object>>> records() {
+        Long userId = currentUserId();
+        if (userId == null) return Result.fail(401, "未登录或账号不存在");
+        return Result.ok(interviewService.records(userId));
+    }
+
+    /** GET /api/interview/records/{id} 单场面试详情（含逐题明细） */
+    @GetMapping("/records/{id}")
+    public Result<Map<String, Object>> recordDetail(@PathVariable Long id) {
+        Long userId = currentUserId();
+        if (userId == null) return Result.fail(401, "未登录或账号不存在");
+        return Result.ok(interviewService.recordDetail(userId, id));
     }
 }

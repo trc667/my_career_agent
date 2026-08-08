@@ -12,12 +12,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.example.aimaster.entity.BaguCheckin;
 import com.example.aimaster.entity.Conversation;
+import com.example.aimaster.entity.InterviewRecord;
 import com.example.aimaster.entity.PointLog;
 import com.example.aimaster.entity.RedeemRecord;
 import com.example.aimaster.entity.SignIn;
 import com.example.aimaster.entity.User;
 import com.example.aimaster.mapper.BaguCheckinMapper;
 import com.example.aimaster.mapper.ConversationMapper;
+import com.example.aimaster.mapper.InterviewRecordMapper;
 import com.example.aimaster.mapper.PointLogMapper;
 import com.example.aimaster.mapper.RedeemRecordMapper;
 import com.example.aimaster.mapper.SignInMapper;
@@ -41,16 +43,19 @@ public class AdminStatsService {
     private final BaguCheckinMapper baguCheckinMapper;
     private final PointLogMapper pointLogMapper;
     private final RedeemRecordMapper redeemRecordMapper;
+    private final InterviewRecordMapper interviewRecordMapper;
 
     public AdminStatsService(UserMapper userMapper, ConversationMapper conversationMapper,
                              SignInMapper signInMapper, BaguCheckinMapper baguCheckinMapper,
-                             PointLogMapper pointLogMapper, RedeemRecordMapper redeemRecordMapper) {
+                             PointLogMapper pointLogMapper, RedeemRecordMapper redeemRecordMapper,
+                             InterviewRecordMapper interviewRecordMapper) {
         this.userMapper = userMapper;
         this.conversationMapper = conversationMapper;
         this.signInMapper = signInMapper;
         this.baguCheckinMapper = baguCheckinMapper;
         this.pointLogMapper = pointLogMapper;
         this.redeemRecordMapper = redeemRecordMapper;
+        this.interviewRecordMapper = interviewRecordMapper;
     }
 
     /** 运营总览统计 */
@@ -118,6 +123,15 @@ public class AdminStatsService {
         redeems.put("count", allRedeems.size());
         redeems.put("points", redeemPoints);
         data.put("redeems", redeems);
+
+        // ===== 面试模拟（VIP 卖点效果） =====
+        long totalInterviews = interviewRecordMapper.selectCount(null);
+        long weekInterviews = interviewRecordMapper.selectCount(new LambdaQueryWrapper<InterviewRecord>()
+                .ge(InterviewRecord::getCreateTime, weekStart));
+        Map<String, Object> interviews = new LinkedHashMap<>();
+        interviews.put("total", totalInterviews);
+        interviews.put("week", weekInterviews);
+        data.put("interviews", interviews);
 
         // ===== 消费去向 Top（本周积分扣减原因 Top 5） =====
         Map<String, Integer> spendByReason = new HashMap<>();

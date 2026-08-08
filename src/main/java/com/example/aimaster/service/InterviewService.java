@@ -1,6 +1,7 @@
 package com.example.aimaster.service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -11,8 +12,10 @@ import java.util.concurrent.TimeUnit;
 
 import com.example.aimaster.dto.InterviewAnswerRequest;
 import com.example.aimaster.dto.InterviewStartRequest;
+import com.example.aimaster.entity.InterviewRecord;
 import com.example.aimaster.entity.User;
 import com.example.aimaster.exception.BusinessException;
+import com.example.aimaster.mapper.InterviewRecordMapper;
 import com.example.aimaster.mapper.UserMapper;
 import com.example.aimaster.rag.HybridRetriever;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -111,6 +114,7 @@ public class InterviewService {
     private final BaguService baguService;
     private final UserMapper userMapper;
     private final ObjectMapper objectMapper;
+    private final InterviewRecordMapper interviewRecordMapper;
 
     /** sessionId → 面试会话 */
     private final Cache<String, Session> sessions = Caffeine.newBuilder()
@@ -124,12 +128,14 @@ public class InterviewService {
             .build();
 
     public InterviewService(ChatModel chatModel, HybridRetriever hybridRetriever,
-                            BaguService baguService, UserMapper userMapper, ObjectMapper objectMapper) {
+                            BaguService baguService, UserMapper userMapper, ObjectMapper objectMapper,
+                            InterviewRecordMapper interviewRecordMapper) {
         this.chatModel = chatModel;
         this.hybridRetriever = hybridRetriever;
         this.baguService = baguService;
         this.userMapper = userMapper;
         this.objectMapper = objectMapper;
+        this.interviewRecordMapper = interviewRecordMapper;
     }
 
     /** 开始面试：次数校验 → 抽 5 题 → 建会话 → 返回第 1 题 */
@@ -223,7 +229,64 @@ public class InterviewService {
         data.put("totalScore", totalSum / QUESTION_COUNT);
         data.put("dimensions", dimensions);
         data.put("items", items);
+
+        // 完成即落库：供个人中心历史回看 / 周报 / 运营看板统计（失败不影响本次返回）
+        try {
+            interviewRecordMapper.insert(InterviewRecord.builder()
+                    .userId(userId)
+                    .position(session.position())
+                    .totalScore(totalSum / QUESTION_COUNT)
+                    .dimensionsJson(objectMapper.writeValueAsString(dimensions))
+                    .itemsJson(objectMapper.writeValueAsString(items))
+                    .createTime(LocalDateTime.now())
+                    .build());
+            log.info("面试记录已保存: userId={} position={} score={}", userId, session.position(), totalSum / QUESTION_COUNT);
+        } catch (Exception e) {
+            log.warn("面试记录落库失败: {}", e.getMessage());
+        }
         return data;
+    }
+
+    /** 我的面试记录列表（倒序，不含逐题明细以减负载） */
+    public List<Map<String, Object>> records(Long userId) {
+        return interviewRecordMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<InterviewRecord>()
+                        .eq(InterviewRecord::getUserId, userId)
+                        .orderByDesc(InterviewRecord::getId)
+                        .last("LIMIT 50"))
+                .stream().map(r -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("id", r.getId());
+                    m.put("position", r.getPosition());
+                    m.put("totalScore", r.getTotalScore());
+                    m.put("dimensions", parseJson(r.getDimensionsJson()));
+                    m.put("createdAt", r.getCreateTime());
+                    return m;
+                }).toList();
+    }
+
+    /** 单场面试记录详情（含逐题明细），仅本人可看 */
+    public Map<String, Object> recordDetail(Long userId, Long recordId) {
+        InterviewRecord r = interviewRecordMapper.selectById(recordId);
+        if (r == null || !r.getUserId().equals(userId)) throw new BusinessException("记录不存在");
+        Map<String, Object> m = new HashMap<>();
+        m.put("id", r.getId());
+        m.put("position", r.getPosition());
+        m.put("totalScore", r.getTotalScore());
+        m.put("dimensions", parseJson(r.getDimensionsJson()));
+        m.put("items", parseJson(r.getItemsJson()));
+        m.put("createdAt", r.getCreateTime());
+        return m;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Object> parseJson(String json) {
+        if (json == null || json.isBlank()) return new ArrayList<>();
+        try {
+            return objectMapper.readValue(json, List.class);
+        } catch (Exception e) {
+            log.warn("面试记录 JSON 解析失败: {}", e.getMessage());
+            return new ArrayList<>();
+        }
     }
 
     /** 剩余面试次数（VIP 返回 -1 表示不限） */

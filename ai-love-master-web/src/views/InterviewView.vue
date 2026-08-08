@@ -109,6 +109,7 @@
         </div>
       </div>
       <el-button type="primary" round size="large" @click="reset">再来一次</el-button>
+      <p class="iv-report__saved">✅ 本场面试已存入<a href="#/interview-records" class="iv-report__link">「我的面试」</a></p>
     </div>
 
     <!-- 背景装饰 -->
@@ -711,6 +712,18 @@ function scoreClass(s: number) {
 .iv-report .el-button {
   display: block;
   margin: 0 auto;
+}
+
+.iv-report__saved {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+
+.iv-report__link {
+  color: var(--app-primary);
+  text-decoration: none;
 }
 
 /* 背景 */

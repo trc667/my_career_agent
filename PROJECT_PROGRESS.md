@@ -51,7 +51,7 @@
 12. **分享裂变**：注册页支持邀请码预填（/register?invite=xxx）+ 二维码邀请卡片（复制链接），被邀人完成首聊 → 邀请人 +50 积分（invite_reward 唯一键防刷）（`AuthServiceImpl`/`PointService.rewardInviterOnFirstChat`/`UserCenterView` 邀请卡片）
 13. **商用落地风 UI**：全局主题 token 重构（单主色商业蓝 #2f6bff + 大圆角 16/24 + 柔和阴影 + 大面积留白渐变）；像素风全部移除（字体/硬阴影/装饰）；首页仪表盘化（数据统计卡片网格：积分/连续签到/会员/邀请 + 功能卡片 hover 上浮）（`global.css`/`pixel.css` 语义重写/`HomePage`）
 14. **成就徽章 + 签到进度 + 动效**：9 枚成就（初次对话/常驻咨询/七天连胜/月度铁人/引荐/人气/社交/积分两档）实时数据判定；签到 7 天周期进度条（再签 N 天解锁 +10）；动效升级（聊天气泡弹入/积分 count-up/卡片 hover）（`AchievementService`/`GET /api/user/achievements`/`useCountUp`/`ChatMessageList`）
-15. **AI 面试模拟**（/interview）：选岗位 → 按 autoTag 分类从知识库抽 5 段知识点（LLM 统一改写成可直接作答的面试问句，失败降级原文）→ 逐题作答 AI 点评打分（RAG 参考要点对照）→ 总结报告（总分/分维度均值/题目明细 + canvas 自绘雷达图）；FREE 每日 2 次、VIP 不限次 + qwen-max 深度点评（4 维度）；会话 Caffeine 缓存 30 分钟（`InterviewService`/`InterviewController`/`InterviewView.vue`）
+15. **AI 面试模拟**（/interview）：选岗位 → 按 autoTag 分类从知识库抽 5 段知识点（LLM 统一改写成可直接作答的面试问句，失败降级原文）→ 逐题作答 AI 点评打分（RAG 参考要点对照）→ 总结报告（总分/分维度均值/题目明细 + canvas 自绘雷达图）；FREE 每日 2 次、VIP 不限次 + qwen-max 深度点评（4 维度）；会话 Caffeine 缓存 30 分钟；**完成即落库 interview_record，个人中心「我的面试」历史回看（逐题点评）**（`InterviewService`/`InterviewController`/`InterviewView.vue`/`InterviewRecordsView.vue`）
 16. **积分商城**（/shop）：积分兑换出口（断点①修复）——简历模板/校招时间线/面试高频题 TOP50 资料（30/50/80 分）+ 7 天 VIP 体验卡（200 分）；原子扣分 + point_log 流水 + redeem_record 记录双写审计；VIP 卡兑换即开通，个人中心积分卡片入口（`ShopService`/`ShopController`/`ShopView.vue`）
 17. **用户学习周报**（/weekly-report）：本周（周一起）聚合对话主题/签到/八股打卡/错题/简历评分/积分账本/成就，规则生成建议（零 LLM 成本）；个人中心入口条（`WeeklyReportService`/`GET /api/user/weekly-report`/`WeeklyReportView.vue`）
 18. **运营看板**（管理后台 tab）：用户规模（总数/本周新增/VIP）、今日活跃（对话∪签到去重）、对话/签到/八股打卡、本周积分发放消耗、商城兑换统计、积分消耗去向 Top5（`AdminStatsService`/`GET /api/admin/stats`/`AdminView`「运营看板」tab）
@@ -93,6 +93,7 @@
 | 用户学习周报（本周聚合对话/签到/错题/积分 + 建议） | ✅ |
 | 运营看板（用户/活跃/积分消耗统计，管理后台 tab） | ✅ |
 | 首页数据面板（学习仪表盘 + 动态天气面板） | ✅ |
+| 面试记录落库 + 历史回看（周报/看板面试维度） | ✅ |
 | Git 提交（安全审查通过，分 5 模块 commit；push 待本地执行） | ✅ |
 
 ## 五、量化成果（面试数据）
@@ -124,7 +125,7 @@
 - 像素风：`styles/pixel.css`（已语义重写为商用工具类，类名保留组件零改动）、`components/PixelIcon.vue`（pixelarticons 线性图标保留）
 - 商用风：`styles/global.css`（设计 token：主色 #2f6bff/大圆角/柔和阴影/Element Plus 主色覆盖）、`HomePage` 仪表盘（数据统计卡片网格）
 - 成就/动效：`service/AchievementService`（成就规则+实时数据判定，9 枚）、`GET /api/user/achievements`、前端 `composables/useCountUp`、`ChatMessageList` 气泡动画、个人中心/首页签到 7 天进度条
-- 面试模拟：`service/InterviewService`（抽题 drawQuestions 分类优先+全库兜底/题目 LLM 改写问句 toInterviewQuestions 降级原文/会话 Caffeine TTL 30min/点评 RAG 参考要点对照/VIP qwen-max 深度 4 维度/FREE 每日 2 次）、`controller/InterviewController`（/api/interview/start|answer|report|quota）、`dto/InterviewStartRequest`+`InterviewAnswerRequest`、前端 `views/InterviewView.vue`+`api/interview.ts`+路由 /interview+首页第 5 卡
+- 面试模拟：`service/InterviewService`（抽题 drawQuestions 分类优先+全库兜底/题目 LLM 改写问句 toInterviewQuestions 降级原文/会话 Caffeine TTL 30min/点评 RAG 参考要点对照/VIP qwen-max 深度 4 维度/FREE 每日 2 次/完成即落库 interview_record+records/recordDetail）、`controller/InterviewController`（/api/interview/start|answer|report|quota|records|records/{id}）、`entity/InterviewRecord`、前端 `views/InterviewView.vue`+`InterviewRecordsView.vue`+路由 /interview|/interview-records
 - 积分商城：`service/ShopService`（原子扣分 UPDATE...WHERE points>=cost 防超扣 + point_log/redeem_record 双写 + VIP_CARD 调 grantVip）、`controller/ShopController`（/api/shop/items|redeem|records）、`entity/RedeemItem`+`RedeemRecord`、表 `redeem_item`/`redeem_record`（schema.sql 内置 4 个初始商品）、前端 `views/ShopView.vue`+`api/shop.ts`+路由 /shop+个人中心入口
 - 周报：`service/WeeklyReportService`（本周一 00:00 起聚合 conversation/sign_in/bagu_*/point_log/redeem_record/resume_review + 规则建议）、`GET /api/user/weekly-report`、前端 `views/WeeklyReportView.vue`+路由 /weekly-report+个人中心入口条
 - 运营看板：`service/AdminStatsService`（用户/今日活跃 DISTINCT 去重/积分账本/兑换/消耗去向 Top5）、`GET /api/admin/stats`、前端 `AdminView.vue`「运营看板」tab

@@ -163,6 +163,18 @@ INSERT INTO redeem_item (name, description, points, type, payload, sort)
 SELECT '7 天 VIP 体验卡', '解锁 VIP 全部权益：不限次面试模拟 + qwen-max 深度点评 + 免积分消耗', 200, 'VIP_CARD', '7', 4
 WHERE NOT EXISTS (SELECT 1 FROM redeem_item WHERE type='VIP_CARD');
 
+-- 面试记录表：完成一场面试即落库（供历史回看/周报/运营看板统计）
+CREATE TABLE IF NOT EXISTS interview_record (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    position VARCHAR(32) NOT NULL COMMENT '面试岗位',
+    total_score INT NOT NULL COMMENT '总分',
+    dimensions_json TEXT NOT NULL COMMENT '分维度均值 [{"name":"专业度","score":80}]',
+    items_json TEXT NOT NULL COMMENT '逐题明细 [{"question":"...","score":78,"comment":"..."}]',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_ivr_user (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- 意见反馈表
 CREATE TABLE IF NOT EXISTS feedback (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

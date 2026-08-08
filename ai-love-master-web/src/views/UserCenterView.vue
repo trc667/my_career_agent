@@ -75,6 +75,16 @@
         <span class="uc-report__arrow">→</span>
       </router-link>
 
+      <!-- 面试记录入口（历史回看） -->
+      <router-link to="/interview-records" class="uc-report">
+        <span class="uc-report__icon">🎯</span>
+        <div class="uc-report__text">
+          <span class="uc-report__title">我的面试</span>
+          <span class="uc-report__desc">回看每场面试得分与逐题点评，见证进步</span>
+        </div>
+        <span class="uc-report__arrow">→</span>
+      </router-link>
+
       <!-- 成就徽章（留存游戏化） -->
       <div v-if="achievements.length" class="uc-achv">
         <h3 class="uc-achv__title">🏅 成就徽章</h3>
