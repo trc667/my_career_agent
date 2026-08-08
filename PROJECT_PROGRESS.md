@@ -23,7 +23,7 @@
 | 向量库 | PostgreSQL 18 + pgvector 0.8.6（HNSW，双数据源：MySQL 业务 + PG 向量） |
 | 稀疏检索 | Lucene 9.11（IK-analyzer ik_smart 中文分词）+ BM25Similarity |
 | 本地缓存 | Caffeine（SemanticCache 语义问答 / ContextCompressor 会话摘要，容量+过期原生管理） |
-| 前端 | Vue3 + TS + Vite + Element Plus（`ai-love-master-web`，端口 5175） |
+| 前端 | Vue3 + TS + Vite + Element Plus（`ai-love-master-web`，端口 5175），商用落地风 UI（单主色/大圆角/柔和渐变/仪表盘卡片） |
 | 存储 | MySQL（用户/公告/反馈/会话/消息/简历评分/知识库/积分流水/签到）、OSS（头像，阿里云 web-tlias-122） |
 
 ## 二、RAG 六流程（生产链路已全部接入）
@@ -48,7 +48,11 @@
 9. **多轮历史融合检索 + 语义缓存**：检索 query 并入最近 1-2 轮历史问题（指代性问题召回提升）；相同独立问题 30 分钟内直接命中缓存答案（20ms/0 token）（`CareerMasterServiceImpl.buildRagQuery`/`SemanticCache`）
 10. **Prompt 结构优化 + HyDE 分流**：回答策略分层（事实依据/来源标注/拒答区分）；复杂问题先 LLM 生成假设文档再检索，简单问题标准 RAG（`CareerMasterPrompt`/`ComplexityClassifier`）
 11. **积分/会员体系**：每日签到（连续 7 天奖励）+ 聊天点赞积分 + 流水可审计 + **聊天消耗积分**（职规 1 分/次、超级智能体 2 分/次，VIP/ADMIN 免扣，FAQ/缓存命中不扣）+ 首页顶栏积分徽章/状态条快捷签到 + VIP 分级限流（游客 10/FREE 20/VIP 60 次/分）（`PointService`/`RateLimitByLevelFilter`/`HomePage`/`UserCenterView`）
-12. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
+12. **分享裂变**：注册页支持邀请码预填（/register?invite=xxx）+ 二维码邀请卡片（复制链接），被邀人完成首聊 → 邀请人 +50 积分（invite_reward 唯一键防刷）（`AuthServiceImpl`/`PointService.rewardInviterOnFirstChat`/`UserCenterView` 邀请卡片）
+13. **商用落地风 UI**：全局主题 token 重构（单主色商业蓝 #2f6bff + 大圆角 16/24 + 柔和阴影 + 大面积留白渐变）；像素风全部移除（字体/硬阴影/装饰）；首页仪表盘化（数据统计卡片网格：积分/连续签到/会员/邀请 + 功能卡片 hover 上浮）（`global.css`/`pixel.css` 语义重写/`HomePage`）
+14. **成就徽章 + 签到进度 + 动效**：9 枚成就（初次对话/常驻咨询/七天连胜/月度铁人/引荐/人气/社交/积分两档）实时数据判定；签到 7 天周期进度条（再签 N 天解锁 +10）；动效升级（聊天气泡弹入/积分 count-up/卡片 hover）（`AchievementService`/`GET /api/user/achievements`/`useCountUp`/`ChatMessageList`）
+15. **AI 面试模拟**（/interview）：选岗位 → 按 autoTag 分类从知识库抽 5 题 → 逐题作答 AI 点评打分（RAG 参考要点对照）→ 总结报告（总分/分维度均值/题目明细 + canvas 自绘雷达图）；FREE 每日 2 次、VIP 不限次 + qwen-max 深度点评（4 维度）；会话 Caffeine 缓存 30 分钟（`InterviewService`/`InterviewController`/`InterviewView.vue`）
+16. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
 
 ## 四、本轮任务进度（已完成并验证）
 
@@ -77,6 +81,10 @@
 | Prompt 结构优化 + HyDE 分流（分层回答策略；复杂问题 HyDE 假设文档检索，失败降级） | ✅ |
 | 积分/会员体系（签到积分 + 流水审计 + VIP 分级限流 + 个人中心卡片） | ✅ |
 | 聊天消耗积分 + 首页积分组件（FREE 扣分/VIP 免扣/FAQ 缓存不扣 + 顶栏徽章/快捷签到） | ✅ |
+| 分享裂变（注册邀请码绑定 + 首聊奖励 +50 + 二维码卡片，幂等防刷） | ✅ |
+| 商用落地风 UI 改造（单主色/大圆角/柔和阴影/仪表盘首页，像素风移除） | ✅ |
+| 成就徽章 + 签到 7 天进度 + 动效升级（气泡弹入/count-up） | ✅ |
+| AI 面试模拟（抽题/点评/报告/次数限制 + 首页第 5 卡） | ✅ |
 | Git 提交（安全审查通过，分模块推送 GitHub） | ✅ |
 
 ## 五、量化成果（面试数据）
@@ -105,7 +113,10 @@
 - Prompt：`config/CareerMasterPrompt`（分层回答策略：事实依据/来源标注/拒答区分/篇幅结构）
 - 积分/会员：`service/PointService`（签到幂等/连续天数/流水审计/VIP 懒回落）、`security/RateLimitByLevelFilter`（游客10/FREE20/VIP60/ADMIN不限）、`entity/PointLog`+`entity/SignIn`+Mapper、接口 `/api/user/points`/`/api/user/sign-in`/`/api/admin/points`/`/api/admin/vip`、前端 `UserCenterView` 积分卡片
 - 协议：前端 `views/AgreementView`、路由 `/agreement`
-- 像素风：`styles/pixel.css`（工具类）、`components/PixelIcon.vue`（pixelarticons 像素图标）、依赖 `pixelarticons`/`@fontsource/press-start-2p`
+- 像素风：`styles/pixel.css`（已语义重写为商用工具类，类名保留组件零改动）、`components/PixelIcon.vue`（pixelarticons 线性图标保留）
+- 商用风：`styles/global.css`（设计 token：主色 #2f6bff/大圆角/柔和阴影/Element Plus 主色覆盖）、`HomePage` 仪表盘（数据统计卡片网格）
+- 成就/动效：`service/AchievementService`（成就规则+实时数据判定，9 枚）、`GET /api/user/achievements`、前端 `composables/useCountUp`、`ChatMessageList` 气泡动画、个人中心/首页签到 7 天进度条
+- 面试模拟：`service/InterviewService`（抽题 drawQuestions 分类优先+全库兜底/会话 Caffeine TTL 30min/点评 RAG 参考要点对照/VIP qwen-max 深度 4 维度/FREE 每日 2 次）、`controller/InterviewController`（/api/interview/start|answer|report|quota）、`dto/InterviewStartRequest`+`InterviewAnswerRequest`、前端 `views/InterviewView.vue`+`api/interview.ts`+路由 /interview+首页第 5 卡
 - 知识库：`resources/rag/career-tips.txt`（629 段种子源，仅首次导入用）；`entity/Knowledge` + `mapper/KnowledgeMapper` + `service/KnowledgeService`（DB 事实源，在线增删改查 + 异步全量重建 pgvector/BM25/八股缓存）；表 `knowledge`
 - 知识库管理接口：`controller/AdminController`（/api/admin/knowledge*）+ 前端 `AdminView.vue`「知识库管理」tab + `api/admin.ts`
 - 配置：`application.yml`（公共）、`application-dev.yml`（敏感，不入库）、`application-raggen.yml`（批量生成）
@@ -143,7 +154,7 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - [x] 知识库管理入口（管理后台在线增删改查知识段）
 - [ ] docker-compose 编排 —— 【暂缓】待部署时一并实施
 - [x] 商业化：积分/会员体系（签到积分 + VIP 分级限流 + 流水审计）
-- [ ] 商业化：分享裂变（分享海报/链接，邀请好友解锁次数）
+- [x] 商业化：分享裂变（邀请码 + 首聊奖励 + 二维码卡片）
 
 ### P3 暂缓/锦上添花
 - [ ] 商业化：小程序/移动端（等真实用户数据）
@@ -170,3 +181,6 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - HyDE 分流验证：日志「HyDE 分流生效：query N 字 → HyDE M 字」即触发；默认开启，量化增益后可按数据调 `app.rag.hyde.enabled`
 - 积分/会员验证：签到幂等（同日重复 400）；管理员发分写流水可审计；限流日志「分级限流触发」；PowerShell 测试脚本中已 JSON 字符串勿再 `ConvertTo-Json`（会二次转义导致 400）
 - 聊天扣分验证：FREE 对话 50→49 扣 1 分；FAQ/语义缓存命中不扣（没花 LLM 钱）；VIP/ADMIN 免扣；扣分用原子 SQL（UPDATE ... WHERE points >= cost）防并发超扣
+- 分享裂变验证：被邀人首轮对话（历史=user+assistant 两条）触发邀请人 +50，invite_reward 唯一键防重复奖励；沙箱无法收注册邮件，验证用 SQL 直接绑 inviter_id
+- 沙箱 Stop-Process 会静默失败：重启后端必须复核 8080 归属（Get-CimInstance + 直接 PID 停止），否则新代码不生效且旧进程继续占用（曾致新接口 404）；Get-NetTCPConnection 在该环境不可靠可能返回空，以 netstat/Get-CimInstance 为准
+- 成就验证：数据实时判定（对话次数按 point_log「AI 对话消耗」计数、累计积分按正数流水求和），规则改代码即生效不落表
