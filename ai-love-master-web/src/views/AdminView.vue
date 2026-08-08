@@ -45,6 +45,28 @@
               <span class="stats-card__value app-num">{{ stats.redeems?.count ?? 0 }}</span>
               <span class="stats-card__sub">累计消耗 {{ stats.redeems?.points ?? 0 }} 积分</span>
             </div>
+            <div class="stats-card">
+              <span class="stats-card__label">面试模拟</span>
+              <span class="stats-card__value app-num">{{ stats.interviews?.total ?? 0 }}</span>
+              <span class="stats-card__sub">本周 {{ stats.interviews?.week ?? 0 }} 场（VIP 卖点）</span>
+            </div>
+            <!-- 转化漏斗 -->
+            <div class="stats-card stats-card--wide">
+              <span class="stats-card__label">用户转化漏斗（相对注册数）</span>
+              <div class="funnel">
+                <div v-for="(s, i) in stats.funnel" :key="i" class="funnel__row">
+                  <span class="funnel__stage" :class="{ 'is-key': i === stats.funnel.length - 1 }">{{ s.stage }}</span>
+                  <el-progress
+                    :percentage="Math.min(100, s.rate)"
+                    :stroke-width="10"
+                    :show-text="false"
+                    :color="funnelColor(i, s.rate)"
+                  />
+                  <span class="funnel__count app-num">{{ s.count }}</span>
+                  <span class="funnel__rate">{{ s.rate }}%</span>
+                </div>
+              </div>
+            </div>
             <div class="stats-card stats-card--wide">
               <span class="stats-card__label">本周积分消耗去向</span>
               <div v-if="stats.spendTop?.length" class="stats-top">
@@ -326,6 +348,8 @@ const stats = ref<AdminStats>({
   points: { earned: 0, spent: 0 },
   redeems: { count: 0, points: 0 },
   spendTop: [],
+  interviews: { total: 0, week: 0 },
+  funnel: [],
 });
 const announcements = ref<Notice[]>([]);
 const feedbacks = ref<AdminFeedback[]>([]);
@@ -355,6 +379,14 @@ const kbRebuild = reactive({ rebuilding: false, status: 'idle', info: '' });
 function formatTime(t?: string) {
   if (!t) return '';
   return String(t).slice(0, 19).replace('T', ' ');
+}
+
+/** 漏斗进度条颜色：最后阶段(VIP)高亮，其余按转化率降序渐变 */
+function funnelColor(index: number, rate: number) {
+  if (index === 4) return '#16a34a';
+  if (rate >= 50) return '#2f6bff';
+  if (rate >= 20) return '#7b5bff';
+  return '#94a3b8';
 }
 
 async function loadStats() {
@@ -712,6 +744,42 @@ onMounted(() => {
 .stats-top__points {
   font-size: 14px;
   font-weight: 700;
+  text-align: right;
+}
+
+/* 转化漏斗 */
+.funnel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.funnel__row {
+  display: grid;
+  grid-template-columns: 110px 1fr 50px 56px;
+  align-items: center;
+  gap: 12px;
+}
+
+.funnel__stage {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.funnel__stage.is-key {
+  color: #16a34a;
+}
+
+.funnel__count {
+  font-size: 14px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.funnel__rate {
+  font-size: 12px;
+  color: var(--app-text-secondary);
   text-align: right;
 }
 

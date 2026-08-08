@@ -50,6 +50,8 @@ export interface AdminStats {
   points: { earned: number; spent: number };
   redeems: { count: number; points: number };
   spendTop: { reason: string; points: number }[];
+  interviews: { total: number; week: number };
+  funnel: { stage: string; count: number; rate: number }[];
 }
 
 export function getAdminStats() {

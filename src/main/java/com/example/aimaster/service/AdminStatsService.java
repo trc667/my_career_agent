@@ -133,6 +133,9 @@ public class AdminStatsService {
         interviews.put("week", weekInterviews);
         data.put("interviews", interviews);
 
+        // ===== 转化漏斗：注册 → 首聊 → 首签 → 兑换 → VIP（商业化自洽证据） =====
+        data.put("funnel", funnel(totalUsers));
+
         // ===== 消费去向 Top（本周积分扣减原因 Top 5） =====
         Map<String, Integer> spendByReason = new HashMap<>();
         weekLogs.stream().filter(l -> l.getChangePoints() != null && l.getChangePoints() < 0)
@@ -150,5 +153,29 @@ public class AdminStatsService {
         data.put("spendTop", spendTop);
 
         return data;
+    }
+
+    /** 转化漏斗：注册 → 首次对话 → 首次签到 → 首次兑换 → VIP（人数 + 相对注册转化率） */
+    private List<Map<String, Object>> funnel(long totalUsers) {
+        long firstChat = conversationMapper.selectObjs(new QueryWrapper<Conversation>().select("DISTINCT user_id")).size();
+        long firstSign = signInMapper.selectObjs(new QueryWrapper<SignIn>().select("DISTINCT user_id")).size();
+        long firstRedeem = redeemRecordMapper.selectObjs(new QueryWrapper<RedeemRecord>().select("DISTINCT user_id")).size();
+        long vipCount = userMapper.selectCount(new LambdaQueryWrapper<User>().eq(User::getLevel, "VIP"));
+        double base = Math.max(1, totalUsers);
+        List<Map<String, Object>> list = new java.util.ArrayList<>();
+        list.add(funnelStage("注册用户", totalUsers, base));
+        list.add(funnelStage("完成首次对话", firstChat, base));
+        list.add(funnelStage("完成首次签到", firstSign, base));
+        list.add(funnelStage("完成积分兑换", firstRedeem, base));
+        list.add(funnelStage("开通 VIP", vipCount, base));
+        return list;
+    }
+
+    private Map<String, Object> funnelStage(String name, long count, double base) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("stage", name);
+        m.put("count", count);
+        m.put("rate", Math.round(count / base * 1000) / 10.0); // 保留 1 位小数
+        return m;
     }
 }

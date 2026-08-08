@@ -54,7 +54,7 @@
 15. **AI 面试模拟**（/interview）：选岗位 → 按 autoTag 分类从知识库抽 5 段知识点（LLM 统一改写成可直接作答的面试问句，失败降级原文）→ 逐题作答 AI 点评打分（RAG 参考要点对照）→ 总结报告（总分/分维度均值/题目明细 + canvas 自绘雷达图）；FREE 每日 2 次、VIP 不限次 + qwen-max 深度点评（4 维度）；会话 Caffeine 缓存 30 分钟；**完成即落库 interview_record，个人中心「我的面试」历史回看（逐题点评）**（`InterviewService`/`InterviewController`/`InterviewView.vue`/`InterviewRecordsView.vue`）
 16. **积分商城**（/shop）：积分兑换出口（断点①修复）——简历模板/校招时间线/面试高频题 TOP50 资料（30/50/80 分）+ 7 天 VIP 体验卡（200 分）；原子扣分 + point_log 流水 + redeem_record 记录双写审计；VIP 卡兑换即开通，个人中心积分卡片入口（`ShopService`/`ShopController`/`ShopView.vue`）
 17. **用户学习周报**（/weekly-report）：本周（周一起）聚合对话主题/签到/八股打卡/错题/简历评分/积分账本/成就，规则生成建议（零 LLM 成本）；个人中心入口条（`WeeklyReportService`/`GET /api/user/weekly-report`/`WeeklyReportView.vue`）
-18. **运营看板**（管理后台 tab）：用户规模（总数/本周新增/VIP）、今日活跃（对话∪签到去重）、对话/签到/八股打卡、本周积分发放消耗、商城兑换统计、积分消耗去向 Top5（`AdminStatsService`/`GET /api/admin/stats`/`AdminView`「运营看板」tab）
+18. **运营看板**（管理后台 tab）：用户规模（总数/本周新增/VIP）、今日活跃（对话∪签到去重）、对话/签到/八股打卡、本周积分发放消耗、商城兑换统计、积分消耗去向 Top5、**面试模拟使用量（VIP 卖点）**、**转化漏斗（注册→首聊→首签→兑换→VIP 相对转化率）**（`AdminStatsService`/`GET /api/admin/stats`/`AdminView`「运营看板」tab）
 19. **首页数据面板**：左侧学习仪表盘（积分渐变数字 + 签到 7 天 SVG 环形进度 + 连续签到/邀请/成就指标 + count-up 动效）+ 右侧动态天气面板（Open-Meteo 免费 API 后端代理，WMO 代码→动效，canvas 雨滴/雪花/闪电 + CSS 云层/雾，城市 chips 切换 + 浏览器定位）（`WeatherService`/`GET /api/weather`（公开）/`DashboardPanel`/`WeatherPanel`）
 20. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
 
