@@ -80,7 +80,7 @@
             我已阅读并同意
             <router-link to="/agreement" target="_blank" class="register-agreement__link">《用户协议》</router-link>
             和
-            <router-link to="/agreement" target="_blank" class="register-agreement__link">《隐私政策》</router-link>
+            <router-link to="/agreement#privacy" target="_blank" class="register-agreement__link">《隐私政策》</router-link>
           </el-checkbox>
         </el-form-item>
         <el-form-item>

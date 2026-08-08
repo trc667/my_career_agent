@@ -11,7 +11,7 @@
       </p>
 
       <section class="agreement-section">
-        <h2>一、用户协议</h2>
+        <h2 id="agreement">一、用户协议</h2>
 
         <h3>1. 服务内容</h3>
         <p>
@@ -59,7 +59,7 @@
       </section>
 
       <section class="agreement-section">
-        <h2>二、隐私政策</h2>
+        <h2 id="privacy">二、隐私政策</h2>
 
         <h3>1. 我们收集的信息</h3>
         <ul>
@@ -116,7 +116,18 @@
 </template>
 
 <script setup lang="ts">
-// 静态文档页，无逻辑
+import { onMounted } from 'vue';
+
+// 支持锚点直达（页脚「隐私政策」链接 /agreement#privacy 滚动到对应章节）
+onMounted(() => {
+  const hash = window.location.hash;
+  if (hash === '#privacy' || hash === '#agreement') {
+    const el = document.getElementById(hash.slice(1));
+    if (el) {
+      setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    }
+  }
+});
 </script>
 
 <style scoped>

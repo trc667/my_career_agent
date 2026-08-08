@@ -52,6 +52,20 @@
         <router-link to="/feedback" class="home__quick-link">
           <PixelIcon name="comment" :size="18" /> 意见反馈
         </router-link>
+        <template v-if="authStore.isAuthenticated()">
+          <router-link to="/bagu" class="home__quick-link">
+            <PixelIcon name="book-open" :size="18" /> 八股练习
+          </router-link>
+          <router-link to="/bagu-practice" class="home__quick-link">
+            <PixelIcon name="note" :size="18" /> 错题本
+          </router-link>
+          <router-link to="/interview-records" class="home__quick-link">
+            <PixelIcon name="star" :size="18" /> 面试记录
+          </router-link>
+          <router-link to="/shop" class="home__quick-link">
+            <PixelIcon name="heart" :size="18" /> 积分商城
+          </router-link>
+        </template>
       </div>
 
       <!-- 状态条：实时时钟 + 倒计时 + 快捷签到 -->
@@ -284,6 +298,53 @@
       </div>
     </section>
 
+    <!-- 本周学习概览（复用周报数据，填充页面底部空白） -->
+    <section v-if="authStore.isAuthenticated() && weekly" class="home__weekly">
+      <div class="home__weekly-head">
+        <h3 class="home__weekly-title">📊 本周学习概览</h3>
+        <router-link to="/weekly-report" class="home__weekly-more">查看完整周报 →</router-link>
+      </div>
+      <div class="home__weekly-grid">
+        <div class="home__weekly-item">
+          <span class="home__weekly-icon">💬</span>
+          <div class="home__weekly-body">
+            <span class="home__weekly-num app-num">{{ weekly.conversation?.count ?? 0 }}</span>
+            <span class="home__weekly-label">本周对话</span>
+          </div>
+        </div>
+        <div class="home__weekly-item">
+          <span class="home__weekly-icon">📅</span>
+          <div class="home__weekly-body">
+            <span class="home__weekly-num app-num">{{ weekly.learning?.signDays ?? 0 }}</span>
+            <span class="home__weekly-label">签到天数</span>
+          </div>
+        </div>
+        <div class="home__weekly-item">
+          <span class="home__weekly-icon">📕</span>
+          <div class="home__weekly-body">
+            <span class="home__weekly-num app-num">+{{ weekly.learning?.newWrong ?? 0 }}</span>
+            <span class="home__weekly-label">新增错题</span>
+          </div>
+        </div>
+        <div class="home__weekly-item">
+          <span class="home__weekly-icon">🎯</span>
+          <div class="home__weekly-body">
+            <span class="home__weekly-num app-num">{{ weekly.output?.interviews ?? 0 }}</span>
+            <span class="home__weekly-label">面试场次</span>
+          </div>
+        </div>
+        <div class="home__weekly-item">
+          <span class="home__weekly-icon">🪙</span>
+          <div class="home__weekly-body">
+            <span class="home__weekly-num app-num" :class="weekly.points?.net > 0 ? 'is-plus' : weekly.points?.net < 0 ? 'is-minus' : ''">
+              {{ (weekly.points?.net ?? 0) > 0 ? '+' : '' }}{{ weekly.points?.net ?? 0 }}
+            </span>
+            <span class="home__weekly-label">积分净变</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- 背景装饰：柔和光斑 + 漂浮圆点 + 像素云/星 -->
     <div class="home__bg" aria-hidden="true">
       <span class="app-orb app-orb--blue home__orb home__orb--1" />
@@ -326,7 +387,7 @@
       <span class="home__footer-sep">·</span>
       <router-link to="/agreement" class="home__footer-link">用户协议</router-link>
       <span class="home__footer-sep">·</span>
-      <router-link to="/agreement" class="home__footer-link">隐私政策</router-link>
+      <router-link to="/agreement#privacy" class="home__footer-link">隐私政策</router-link>
     </footer>
   </div>
 </template>
@@ -341,7 +402,7 @@ import DashboardPanel from '../components/DashboardPanel.vue';
 import WeatherPanel from '../components/WeatherPanel.vue';
 import { useAuthStore } from '../store/authStore';
 import { getLatestNotice, type Notice } from '../api/notice';
-import { getAchievements, getInvite, getPoints, signIn } from '../api/user';
+import { getAchievements, getInvite, getPoints, getWeeklyReport, signIn, type WeeklyReport } from '../api/user';
 import { useCountUp } from '../composables/useCountUp';
 
 const router = useRouter();
@@ -356,6 +417,7 @@ const signing = ref(false);
 const invitedCount = ref(0);
 const achvUnlocked = ref(0);
 const achvTotal = ref(0);
+const weekly = ref<WeeklyReport | null>(null);
 
 /* 积分数字滚动 + 签到 7 天周期进度 */
 const displayedPoints = useCountUp(computed(() => points.value));
@@ -398,6 +460,17 @@ async function loadAchievements() {
     const res = await getAchievements();
     achvUnlocked.value = (res.data ?? []).filter((a) => a.unlocked).length;
     achvTotal.value = (res.data ?? []).length;
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+/** 加载本周学习概览（首页数据条，复用周报聚合） */
+async function loadWeekly() {
+  if (!authStore.isAuthenticated()) return;
+  try {
+    const res = await getWeeklyReport();
+    weekly.value = res.data ?? null;
   } catch {
     // 拦截器已提示
   }
@@ -647,6 +720,7 @@ onMounted(() => {
     loadPoints();
     loadInviteCount();
     loadAchievements();
+    loadWeekly();
   }
 });
 onBeforeUnmount(() => {
@@ -1081,6 +1155,91 @@ function dotStyle(n: number) {
   .home__panels {
     grid-template-columns: 1fr;
   }
+}
+
+/* 本周学习概览 */
+.home__weekly {
+  position: relative;
+  z-index: 2;
+  max-width: var(--app-content-max);
+  width: 100%;
+  margin: 0 auto var(--app-space-2xl);
+  background: var(--app-card);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-md);
+  padding: 18px 20px;
+}
+
+.home__weekly-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.home__weekly-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.home__weekly-more {
+  font-size: 12px;
+  color: var(--app-primary);
+  text-decoration: none;
+}
+
+.home__weekly-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--app-space-md);
+}
+
+.home__weekly-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--app-bg-deep);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  transition: all 0.18s ease;
+}
+
+.home__weekly-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.home__weekly-icon {
+  font-size: 20px;
+}
+
+.home__weekly-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.home__weekly-num {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--app-primary);
+  line-height: 1.1;
+}
+
+.home__weekly-num.is-plus {
+  color: #16a34a;
+}
+
+.home__weekly-num.is-minus {
+  color: #ef4444;
+}
+
+.home__weekly-label {
+  font-size: 11px;
+  color: var(--app-text-secondary);
 }
 
 .home__apps {

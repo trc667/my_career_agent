@@ -56,7 +56,7 @@
           登录即代表同意
           <router-link to="/agreement" target="_blank" class="auth-agreement__link">《用户协议》</router-link>
           与
-          <router-link to="/agreement" target="_blank" class="auth-agreement__link">《隐私政策》</router-link>
+          <router-link to="/agreement#privacy" target="_blank" class="auth-agreement__link">《隐私政策》</router-link>
         </p>
       </el-form>
     </div>

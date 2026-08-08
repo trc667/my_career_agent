@@ -6,8 +6,8 @@
       </div>
       <div class="app-footer__links">
         <router-link to="/feedback" class="app-footer__link app-footer__link--clickable">意见反馈</router-link>
-        <span class="app-footer__link app-footer__link--clickable" @click="showUserAgreement">用户协议</span>
-        <span class="app-footer__link app-footer__link--clickable" @click="showDisclaimer">隐私政策</span>
+        <router-link to="/agreement" class="app-footer__link app-footer__link--clickable">用户协议</router-link>
+        <router-link to="/agreement#privacy" class="app-footer__link app-footer__link--clickable">隐私政策</router-link>
       </div>
       <span class="app-footer__link app-footer__link--clickable" @click="showWechat">联系我们</span>
       <span class="app-footer__author">作者：richard谭</span>
@@ -21,22 +21,6 @@
       <p class="app-footer__wechat-text">微信号：<strong>trc030228</strong></p>
       <el-button type="primary" @click="copyWechatId">复制微信号</el-button>
     </el-dialog>
-    <el-dialog
-      v-model="showUserAgreementDialog"
-      title="用户协议"
-      width="320px"
-      :show-close="true"
-    >
-      <p class="app-footer__wechat-text">trc牛逼</p>
-    </el-dialog>
-    <el-dialog
-      v-model="showDisclaimerDialog"
-      title="隐私政策"
-      width="360px"
-      :show-close="true"
-    >
-      <p class="app-footer__disclaimer">内容为AI生成仅供参考</p>
-    </el-dialog>
   </footer>
 </template>
 
@@ -46,17 +30,7 @@ import { ElMessage } from 'element-plus';
 
 const year = computed(() => new Date().getFullYear());
 const showWechatDialog = ref(false);
-const showDisclaimerDialog = ref(false);
-const showUserAgreementDialog = ref(false);
 const WECHAT_ID = 'trc030228';
-
-function showUserAgreement() {
-  showUserAgreementDialog.value = true;
-}
-
-function showDisclaimer() {
-  showDisclaimerDialog.value = true;
-}
 
 function showWechat() {
   showWechatDialog.value = true;
