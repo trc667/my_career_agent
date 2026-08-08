@@ -117,6 +117,52 @@ CREATE TABLE IF NOT EXISTS invite_reward (
     KEY idx_invite_inviter (inviter_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 积分商城商品表（断点①修复：给积分一个"花得值"的兑换出口）
+CREATE TABLE IF NOT EXISTS redeem_item (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(64) NOT NULL COMMENT '商品名',
+    description VARCHAR(255) NOT NULL DEFAULT '' COMMENT '卖点描述',
+    points INT NOT NULL COMMENT '所需积分',
+    type VARCHAR(16) NOT NULL COMMENT 'VIP_CARD=VIP体验卡 / CONTENT=资料内容',
+    payload VARCHAR(4000) NOT NULL DEFAULT '' COMMENT 'VIP_CARD为开通天数; CONTENT为资料正文',
+    enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否上架',
+    sort INT NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 兑换记录表：谁/何时/换了什么/花了多少（与 point_log 双写可审计）
+CREATE TABLE IF NOT EXISTS redeem_record (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    item_id BIGINT NOT NULL,
+    item_name VARCHAR(64) NOT NULL COMMENT '商品名快照',
+    points INT NOT NULL COMMENT '本次花费',
+    type VARCHAR(16) NOT NULL,
+    payload VARCHAR(4000) NOT NULL DEFAULT '' COMMENT '发放内容快照(VIP天数/资料正文)',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_redeem_user (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 初始商品（仅首次启动插入）
+INSERT INTO redeem_item (name, description, points, type, payload, sort)
+SELECT '简历模板合集', '10 套大厂风格模板：STAR 项目公式 + 量化成果写法 + 排版避坑', 30, 'CONTENT',
+'【简历模板合集】核心写法：\n1. 项目经历用 STAR 公式：背景→任务→行动→量化结果；\n2. 量化公式：动词 + 指标 + 幅度，如"将接口 P99 延迟从 500ms 压到 120ms（-76%）"；\n3. 排版避坑：一页内、时间倒序、技能按岗位取舍、统一字体（10.5pt+）；\n4. 高频错误：职责堆砌无结果、夸张技能等级、错别字。', 1
+WHERE NOT EXISTS (SELECT 1 FROM redeem_item);
+
+INSERT INTO redeem_item (name, description, points, type, payload, sort)
+SELECT '校招时间线规划表', '从备战到入职的 12 个月节奏：实习/刷题/八股/简历/投递时间窗', 50, 'CONTENT',
+'【校招时间线（以秋招为例）】\nT-12月：定方向，选 1 主 1 备技术栈，开始刷题（每天 2 题）；\nT-9月：刷题 100 题 + 八股第一轮，投递暑期实习；\nT-6月：实习中沉淀项目，收集量化数据，写初版简历；\nT-3月：简历定稿 + 面试模拟 5 轮 + 八股二轮 + 算法周赛；\nT-1月：秋招提前批投递（大厂 6-7 月开放），内推优先；\n秋招期：每周 3 场面试复盘，错题本同步更新；\n签约后：技术纵深 + 补短板，为转正/社招蓄力。', 2
+WHERE NOT EXISTS (SELECT 1 FROM redeem_item WHERE name='校招时间线规划表');
+
+INSERT INTO redeem_item (name, description, points, type, payload, sort)
+SELECT '面试高频题 TOP50', '覆盖后端/前端/算法的高频面试题清单（含要点提示）', 80, 'CONTENT',
+'【面试高频题 TOP50 节选】\n后端：HashMap 原理/并发安全；Spring IoC 与 AOP；MySQL 索引为什么快；事务隔离级别；Redis 缓存穿透/击穿/雪崩；JVM 内存模型与 GC；\n算法：TopK/快排/DP 背包/二叉树遍历/链表环检测/字符串匹配；\n前端：事件循环/闭包/虚拟 DOM/响应式原理/性能优化；\n综合：项目难点与量化、职业规划、反问环节。\n提示：每题按"概念→原理→场景→优化"四段式作答，配合本平台面试模拟练习更佳。', 3
+WHERE NOT EXISTS (SELECT 1 FROM redeem_item WHERE name='面试高频题 TOP50');
+
+INSERT INTO redeem_item (name, description, points, type, payload, sort)
+SELECT '7 天 VIP 体验卡', '解锁 VIP 全部权益：不限次面试模拟 + qwen-max 深度点评 + 免积分消耗', 200, 'VIP_CARD', '7', 4
+WHERE NOT EXISTS (SELECT 1 FROM redeem_item WHERE type='VIP_CARD');
+
 -- 意见反馈表
 CREATE TABLE IF NOT EXISTS feedback (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

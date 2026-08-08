@@ -52,7 +52,8 @@
 13. **商用落地风 UI**：全局主题 token 重构（单主色商业蓝 #2f6bff + 大圆角 16/24 + 柔和阴影 + 大面积留白渐变）；像素风全部移除（字体/硬阴影/装饰）；首页仪表盘化（数据统计卡片网格：积分/连续签到/会员/邀请 + 功能卡片 hover 上浮）（`global.css`/`pixel.css` 语义重写/`HomePage`）
 14. **成就徽章 + 签到进度 + 动效**：9 枚成就（初次对话/常驻咨询/七天连胜/月度铁人/引荐/人气/社交/积分两档）实时数据判定；签到 7 天周期进度条（再签 N 天解锁 +10）；动效升级（聊天气泡弹入/积分 count-up/卡片 hover）（`AchievementService`/`GET /api/user/achievements`/`useCountUp`/`ChatMessageList`）
 15. **AI 面试模拟**（/interview）：选岗位 → 按 autoTag 分类从知识库抽 5 段知识点（LLM 统一改写成可直接作答的面试问句，失败降级原文）→ 逐题作答 AI 点评打分（RAG 参考要点对照）→ 总结报告（总分/分维度均值/题目明细 + canvas 自绘雷达图）；FREE 每日 2 次、VIP 不限次 + qwen-max 深度点评（4 维度）；会话 Caffeine 缓存 30 分钟（`InterviewService`/`InterviewController`/`InterviewView.vue`）
-16. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
+16. **积分商城**（/shop）：积分兑换出口（断点①修复）——简历模板/校招时间线/面试高频题 TOP50 资料（30/50/80 分）+ 7 天 VIP 体验卡（200 分）；原子扣分 + point_log 流水 + redeem_record 记录双写审计；VIP 卡兑换即开通，个人中心积分卡片入口（`ShopService`/`ShopController`/`ShopView.vue`）
+17. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
 
 ## 四、本轮任务进度（已完成并验证）
 
@@ -85,6 +86,7 @@
 | 商用落地风 UI 改造（单主色/大圆角/柔和阴影/仪表盘首页，像素风移除） | ✅ |
 | 成就徽章 + 签到 7 天进度 + 动效升级（气泡弹入/count-up） | ✅ |
 | AI 面试模拟（抽题/点评/报告/次数限制 + 首页第 5 卡） | ✅ |
+| 积分商城（兑换出口：资料 + VIP 体验卡，双写审计） | ✅ |
 | Git 提交（安全审查通过，分 5 模块 commit；push 待本地执行） | ✅ |
 
 ## 五、量化成果（面试数据）
@@ -117,6 +119,7 @@
 - 商用风：`styles/global.css`（设计 token：主色 #2f6bff/大圆角/柔和阴影/Element Plus 主色覆盖）、`HomePage` 仪表盘（数据统计卡片网格）
 - 成就/动效：`service/AchievementService`（成就规则+实时数据判定，9 枚）、`GET /api/user/achievements`、前端 `composables/useCountUp`、`ChatMessageList` 气泡动画、个人中心/首页签到 7 天进度条
 - 面试模拟：`service/InterviewService`（抽题 drawQuestions 分类优先+全库兜底/题目 LLM 改写问句 toInterviewQuestions 降级原文/会话 Caffeine TTL 30min/点评 RAG 参考要点对照/VIP qwen-max 深度 4 维度/FREE 每日 2 次）、`controller/InterviewController`（/api/interview/start|answer|report|quota）、`dto/InterviewStartRequest`+`InterviewAnswerRequest`、前端 `views/InterviewView.vue`+`api/interview.ts`+路由 /interview+首页第 5 卡
+- 积分商城：`service/ShopService`（原子扣分 UPDATE...WHERE points>=cost 防超扣 + point_log/redeem_record 双写 + VIP_CARD 调 grantVip）、`controller/ShopController`（/api/shop/items|redeem|records）、`entity/RedeemItem`+`RedeemRecord`、表 `redeem_item`/`redeem_record`（schema.sql 内置 4 个初始商品）、前端 `views/ShopView.vue`+`api/shop.ts`+路由 /shop+个人中心入口
 - 知识库：`resources/rag/career-tips.txt`（629 段种子源，仅首次导入用）；`entity/Knowledge` + `mapper/KnowledgeMapper` + `service/KnowledgeService`（DB 事实源，在线增删改查 + 异步全量重建 pgvector/BM25/八股缓存）；表 `knowledge`
 - 知识库管理接口：`controller/AdminController`（/api/admin/knowledge*）+ 前端 `AdminView.vue`「知识库管理」tab + `api/admin.ts`
 - 配置：`application.yml`（公共）、`application-dev.yml`（敏感，不入库）、`application-raggen.yml`（批量生成）
@@ -156,7 +159,7 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - [x] 商业化：积分/会员体系（签到积分 + VIP 分级限流 + 流水审计）
 - [x] 商业化：分享裂变（邀请码 + 首聊奖励 + 二维码卡片）
 - [x] 商业化：VIP 卖点（AI 面试模拟 FREE 每日 2 次 / VIP 不限次 + qwen-max 深度点评）
-- [ ] 商业化：积分商城（断点①：积分只有消耗口无兑换出口）—— 积分兑换简历模板/学习资料/7 天 VIP 体验卡/头像框，不涉支付纯内部闭环
+- [x] 商业化：积分商城（兑换出口：简历模板/时间线/高频题 TOP50/7 天 VIP 卡，原子扣分 + 双表审计）
 - [ ] 商业化：运营看板（断点③：管理后台用户活跃/留存/积分消耗统计，当前只有错误监控）
 - [ ] 商业化：用户学习周报（断点②：每周汇总对话主题/错题进步/连续签到/成就解锁，数据资产沉淀）
 

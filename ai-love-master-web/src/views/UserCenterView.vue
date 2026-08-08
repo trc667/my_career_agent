@@ -36,9 +36,14 @@
               到期 {{ formatTime(pointProfile.vipExpireAt) }}
             </span>
           </div>
-          <el-button type="primary" round :disabled="pointProfile.signedToday" :loading="signing" @click="handleSignIn">
-            {{ pointProfile.signedToday ? `已签到 · 连续 ${pointProfile.streakDays} 天` : '每日签到' }}
-          </el-button>
+          <div class="uc-points__actions">
+            <el-button type="primary" round :disabled="pointProfile.signedToday" :loading="signing" @click="handleSignIn">
+              {{ pointProfile.signedToday ? `已签到 · 连续 ${pointProfile.streakDays} 天` : '每日签到' }}
+            </el-button>
+            <router-link to="/shop">
+              <el-button round plain>积分商城</el-button>
+            </router-link>
+          </div>
         </div>
         <!-- 签到 7 天周期进度（第 7 天解锁 +10 奖励） -->
         <div v-if="pointProfile.streakDays > 0" class="uc-points__streak">
@@ -57,7 +62,7 @@
             <span class="uc-points__log-time">{{ formatTime(log.createTime) }}</span>
           </div>
         </div>
-        <p class="uc-points__tip">每日签到 +5 分，连续 7 天额外 +10；点赞 AI 回复 +2 分；对话消耗 1 分/次</p>
+        <p class="uc-points__tip">每日签到 +5 分，连续 7 天额外 +10；点赞 AI 回复 +2 分；积分可在「积分商城」兑换资料与 VIP 体验卡</p>
       </div>
 
       <!-- 成就徽章（留存游戏化） -->
@@ -436,6 +441,12 @@ function handleLogout() {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.uc-points__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .uc-points__left {
