@@ -55,7 +55,8 @@
 16. **积分商城**（/shop）：积分兑换出口（断点①修复）——简历模板/校招时间线/面试高频题 TOP50 资料（30/50/80 分）+ 7 天 VIP 体验卡（200 分）；原子扣分 + point_log 流水 + redeem_record 记录双写审计；VIP 卡兑换即开通，个人中心积分卡片入口（`ShopService`/`ShopController`/`ShopView.vue`）
 17. **用户学习周报**（/weekly-report）：本周（周一起）聚合对话主题/签到/八股打卡/错题/简历评分/积分账本/成就，规则生成建议（零 LLM 成本）；个人中心入口条（`WeeklyReportService`/`GET /api/user/weekly-report`/`WeeklyReportView.vue`）
 18. **运营看板**（管理后台 tab）：用户规模（总数/本周新增/VIP）、今日活跃（对话∪签到去重）、对话/签到/八股打卡、本周积分发放消耗、商城兑换统计、积分消耗去向 Top5（`AdminStatsService`/`GET /api/admin/stats`/`AdminView`「运营看板」tab）
-19. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
+19. **首页数据面板**：左侧学习仪表盘（积分渐变数字 + 签到 7 天 SVG 环形进度 + 连续签到/邀请/成就指标 + count-up 动效）+ 右侧动态天气面板（Open-Meteo 免费 API 后端代理，WMO 代码→动效，canvas 雨滴/雪花/闪电 + CSS 云层/雾，城市 chips 切换 + 浏览器定位）（`WeatherService`/`GET /api/weather`（公开）/`DashboardPanel`/`WeatherPanel`）
+20. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
 
 ## 四、本轮任务进度（已完成并验证）
 
@@ -91,6 +92,7 @@
 | 积分商城（兑换出口：资料 + VIP 体验卡，双写审计） | ✅ |
 | 用户学习周报（本周聚合对话/签到/错题/积分 + 建议） | ✅ |
 | 运营看板（用户/活跃/积分消耗统计，管理后台 tab） | ✅ |
+| 首页数据面板（学习仪表盘 + 动态天气面板） | ✅ |
 | Git 提交（安全审查通过，分 5 模块 commit；push 待本地执行） | ✅ |
 
 ## 五、量化成果（面试数据）
@@ -126,6 +128,7 @@
 - 积分商城：`service/ShopService`（原子扣分 UPDATE...WHERE points>=cost 防超扣 + point_log/redeem_record 双写 + VIP_CARD 调 grantVip）、`controller/ShopController`（/api/shop/items|redeem|records）、`entity/RedeemItem`+`RedeemRecord`、表 `redeem_item`/`redeem_record`（schema.sql 内置 4 个初始商品）、前端 `views/ShopView.vue`+`api/shop.ts`+路由 /shop+个人中心入口
 - 周报：`service/WeeklyReportService`（本周一 00:00 起聚合 conversation/sign_in/bagu_*/point_log/redeem_record/resume_review + 规则建议）、`GET /api/user/weekly-report`、前端 `views/WeeklyReportView.vue`+路由 /weekly-report+个人中心入口条
 - 运营看板：`service/AdminStatsService`（用户/今日活跃 DISTINCT 去重/积分账本/兑换/消耗去向 Top5）、`GET /api/admin/stats`、前端 `AdminView.vue`「运营看板」tab
+- 首页面板：`service/WeatherService`（Open-Meteo 代理 + 内置 10 城经纬度 + WMO→动效映射）、`GET /api/weather`（SecurityConfig 白名单公开）、前端 `components/DashboardPanel.vue`（SVG 环形 + count-up）+ `components/WeatherPanel.vue`（canvas 雨雪/闪电粒子 + CSS 云层）+ `HomePage`「home__panels」布局（1fr+320px，<900px 单列）
 - 知识库：`resources/rag/career-tips.txt`（629 段种子源，仅首次导入用）；`entity/Knowledge` + `mapper/KnowledgeMapper` + `service/KnowledgeService`（DB 事实源，在线增删改查 + 异步全量重建 pgvector/BM25/八股缓存）；表 `knowledge`
 - 知识库管理接口：`controller/AdminController`（/api/admin/knowledge*）+ 前端 `AdminView.vue`「知识库管理」tab + `api/admin.ts`
 - 配置：`application.yml`（公共）、`application-dev.yml`（敏感，不入库）、`application-raggen.yml`（批量生成）

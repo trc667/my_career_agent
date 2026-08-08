@@ -134,6 +134,23 @@
       </div>
     </main>
 
+    <!-- 数据面板区：左侧学习仪表盘 + 右侧动态天气 -->
+    <section class="home__panels">
+      <DashboardPanel
+        class="home__panel home__panel--dash"
+        :points="points"
+        :level="level"
+        :streak-days="streakDays"
+        :streak-in-cycle="streakInCycle"
+        :streak-pct="streakPct"
+        :remain-to-bonus="remainToBonus"
+        :invited-count="invitedCount"
+        :achv-unlocked="achvUnlocked"
+        :achv-total="achvTotal"
+      />
+      <WeatherPanel class="home__panel home__panel--weather" />
+    </section>
+
     <!-- 应用卡片：3D 翻转 -->
     <section class="home__apps">
       <div
@@ -320,9 +337,11 @@ import { useRouter } from 'vue-router';
 import { ElMessageBox } from 'element-plus';
 import { ArrowDown } from '@element-plus/icons-vue';
 import PixelIcon from '../components/PixelIcon.vue';
+import DashboardPanel from '../components/DashboardPanel.vue';
+import WeatherPanel from '../components/WeatherPanel.vue';
 import { useAuthStore } from '../store/authStore';
 import { getLatestNotice, type Notice } from '../api/notice';
-import { getInvite, getPoints, signIn } from '../api/user';
+import { getAchievements, getInvite, getPoints, signIn } from '../api/user';
 import { useCountUp } from '../composables/useCountUp';
 
 const router = useRouter();
@@ -335,6 +354,8 @@ const signedToday = ref(false);
 const streakDays = ref(0);
 const signing = ref(false);
 const invitedCount = ref(0);
+const achvUnlocked = ref(0);
+const achvTotal = ref(0);
 
 /* 积分数字滚动 + 签到 7 天周期进度 */
 const displayedPoints = useCountUp(computed(() => points.value));
@@ -365,6 +386,18 @@ async function loadInviteCount() {
   try {
     const res = await getInvite();
     invitedCount.value = res.data?.invitedCount ?? 0;
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+/** 加载成就解锁数（仪表盘展示） */
+async function loadAchievements() {
+  if (!authStore.isAuthenticated()) return;
+  try {
+    const res = await getAchievements();
+    achvUnlocked.value = (res.data ?? []).filter((a) => a.unlocked).length;
+    achvTotal.value = (res.data ?? []).length;
   } catch {
     // 拦截器已提示
   }
@@ -613,6 +646,7 @@ onMounted(() => {
     authStore.fetchAvatar();
     loadPoints();
     loadInviteCount();
+    loadAchievements();
   }
 });
 onBeforeUnmount(() => {
@@ -1019,6 +1053,36 @@ function dotStyle(n: number) {
 }
 
 /* ===== 应用卡片（3D 翻转） ===== */
+/* 数据面板区：左仪表盘 + 右天气 */
+.home__panels {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: var(--app-space-xl);
+  max-width: var(--app-content-max);
+  width: 100%;
+  margin: 0 auto var(--app-space-2xl);
+}
+
+.home__panel {
+  animation: app-fade-up 0.6s ease both;
+}
+
+.home__panel--dash {
+  animation-delay: 0.05s;
+}
+
+.home__panel--weather {
+  animation-delay: 0.15s;
+}
+
+@media (max-width: 900px) {
+  .home__panels {
+    grid-template-columns: 1fr;
+  }
+}
+
 .home__apps {
   position: relative;
   z-index: 2;

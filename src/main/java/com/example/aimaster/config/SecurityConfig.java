@@ -50,7 +50,7 @@ public class SecurityConfig {
                     res.getWriter().write("{\"code\":401,\"message\":\"未登录或 token 已过期\"}");
                 }))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/api/health", "/api/debug/**", "/api/announcement/**", "/api/config/**", "/api/monitor/report").permitAll()
+                        .requestMatchers("/api/auth/**", "/api/health", "/api/debug/**", "/api/announcement/**", "/api/config/**", "/api/monitor/report", "/api/weather/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS).permitAll()
                         .requestMatchers("/error", "/", "/*.html", "/*.js", "/*.css", "/favicon.ico").permitAll()
                         // 管理接口：仅 ADMIN 角色可访问
