@@ -11,6 +11,7 @@ import com.example.aimaster.dto.ChatResponse;
 import com.example.aimaster.dto.ChatStreamSession;
 import com.example.aimaster.dto.CareerReport;
 import com.example.aimaster.dto.ReActStep;
+import com.example.aimaster.exception.BusinessException;
 import com.example.aimaster.filter.SensitiveWordFilter;
 import com.example.aimaster.memory.ContextCompressor;
 import com.example.aimaster.memory.ConversationMemoryStore;
@@ -19,6 +20,7 @@ import com.example.aimaster.rag.QueryRewriter;
 import com.example.aimaster.rag.RagDocumentLoader;
 import com.example.aimaster.service.CareerMasterService;
 import com.example.aimaster.service.FaqService;
+import com.example.aimaster.service.PointService;
 import com.example.aimaster.service.SemanticCache;
 import com.example.aimaster.tool.FileTool;
 import com.example.aimaster.tool.LoggingToolCallback;
@@ -48,6 +50,8 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -84,6 +88,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
     private final ContextCompressor contextCompressor;
     private final FaqService faqService;
     private final SemanticCache semanticCache;
+    private final PointService pointService;
     private final RagDocumentLoader ragDocumentLoader;
     private final HybridRetriever hybridRetriever;
     private final SyncMcpToolCallbackProvider mcpToolCallbackProvider;
@@ -106,6 +111,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             ContextCompressor contextCompressor,
             FaqService faqService,
             SemanticCache semanticCache,
+            PointService pointService,
             RagDocumentLoader ragDocumentLoader,
             HybridRetriever hybridRetriever,
             @Autowired(required = false) SyncMcpToolCallbackProvider mcpToolCallbackProvider,
@@ -126,6 +132,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         this.contextCompressor = contextCompressor;
         this.faqService = faqService;
         this.semanticCache = semanticCache;
+        this.pointService = pointService;
         this.ragDocumentLoader = ragDocumentLoader;
         this.hybridRetriever = hybridRetriever;
         this.mcpToolCallbackProvider = mcpToolCallbackProvider;
@@ -143,6 +150,11 @@ public class CareerMasterServiceImpl implements CareerMasterService {
 
     private static final String SENSITIVE_WORD_HINT =
             "您输入的内容包含敏感词，已自动过滤。请重新输入有效内容。";
+
+    /** 职规大师单次对话消耗积分（VIP/ADMIN 不扣） */
+    private static final int CHAT_COST = 1;
+    /** 超级智能体单次对话消耗积分（多步 ReAct 更贵） */
+    private static final int REACT_COST = 2;
 
     private String filterText(String text) {
         if (text == null) return null;
@@ -243,6 +255,11 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             return ChatResponse.builder().conversationId(id).usageTokens(0).reply(faq).build();
         }
 
+        String costMsg = tryConsume(currentUsername(), CHAT_COST);
+        if (costMsg != null) {
+            return ChatResponse.builder().conversationId(id).reply(costMsg).build();
+        }
+
         List<Message> msglist = buildPromptMessages(id, systemPrompt.replace("{context}", ""), input);
 
         Prompt prompt = new Prompt(msglist);
@@ -259,6 +276,23 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         return ChatResponse.builder()
                 .conversationId(id).usageTokens(usage).reply(reply != null ? reply : "")
                 .build();
+    }
+
+    /** 当前登录用户名（从 SecurityContext 取，JWT 过滤器已注入） */
+    private String currentUsername() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null ? auth.getName() : "";
+    }
+
+    /** 对话积分扣减：成功返回 null；积分不足返回提示文案（VIP/ADMIN 不扣） */
+    private String tryConsume(String username, int cost) {
+        try {
+            pointService.consumeForChat(username, cost);
+            return null;
+        } catch (BusinessException e) {
+            log.info("对话扣分拦截: {}", e.getMessage());
+            return e.getMessage();
+        }
     }
 
     /**
@@ -386,6 +420,11 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             return ChatResponse.builder().conversationId(id).usageTokens(0).reply(cached).build();
         }
 
+        String costMsg = tryConsume(currentUsername(), CHAT_COST);
+        if (costMsg != null) {
+            return ChatResponse.builder().conversationId(id).reply(costMsg).build();
+        }
+
         // 多轮历史融合 + HyDE 分流检索
         String context = retrieveRagContext(buildSearchQuery(id, input));
         String systemWithContext = systemPrompt.replace("{context}", context != null ? context : "");
@@ -435,6 +474,10 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         String cached = trySemanticCache(id, input, userMessage);
         if (cached != null) {
             return new ChatStreamSession(id, Flux.just(cached));
+        }
+        String costMsg = tryConsume(currentUsername(), CHAT_COST);
+        if (costMsg != null) {
+            return new ChatStreamSession(id, Flux.just(costMsg));
         }
         // 多轮历史融合 + HyDE 分流检索
         String context = retrieveRagContext(buildSearchQuery(id, input));
@@ -611,6 +654,10 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         if (faq != null) {
             return ChatResponse.builder().conversationId(id).reply(faq).steps(List.of()).build();
         }
+        String costMsg = tryConsume(currentUsername(), REACT_COST);
+        if (costMsg != null) {
+            return ChatResponse.builder().conversationId(id).reply(costMsg).steps(List.of()).build();
+        }
         List<Message> msgList = buildPromptMessages(id,
                 systemPrompt.replace("{context}", "") + "\n\n" + AMAP_TOOL_GUIDELINES, input);
         ChatOptions toolOptions = buildToolCallOptionsForReAct();
@@ -671,6 +718,11 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         String faq = tryFaq(id, input, userMessage);
         if (faq != null) {
             sendReplyInChunks(faq, stepConsumer);
+            return;
+        }
+        String costMsg = tryConsume(currentUsername(), REACT_COST);
+        if (costMsg != null) {
+            sendReplyInChunks(costMsg, stepConsumer);
             return;
         }
         if (maxSteps <= 0) {

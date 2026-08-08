@@ -13,6 +13,8 @@
             <span class="home__user-trigger">
               <el-avatar :size="26" class="home__user-avatar" :src="authStore.avatar || undefined">{{ authStore.avatar ? '' : (authStore.username || '我')[0] }}</el-avatar>
               <span class="home__user-name">{{ authStore.username }}</span>
+              <span v-if="points > 0 || level === 'VIP'" class="home__points-badge" title="点击查看积分明细">⚡ {{ points }}</span>
+              <el-tag v-if="level === 'VIP'" type="warning" size="small" effect="dark" class="home__vip-tag">VIP</el-tag>
               <el-icon class="home__user-caret"><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -52,13 +54,25 @@
         </router-link>
       </div>
 
-      <!-- 状态条：实时时钟 + 倒计时 -->
+      <!-- 状态条：实时时钟 + 倒计时 + 快捷签到 -->
       <div class="home__statusbar">
         <span class="home__statusbar-item">
           <PixelIcon name="clock" :size="14" /> <span class="pixel-font">{{ clockText }}</span>
         </span>
         <span class="home__statusbar-item">🏖 距周末 <span class="pixel-font">{{ weekendText }}</span></span>
         <span class="home__statusbar-item">🎉 距{{ holidayName }} <span class="pixel-font">{{ holidayText }}</span></span>
+        <span v-if="authStore.isAuthenticated()" class="home__statusbar-item">
+          <el-button
+            v-if="!signedToday"
+            link
+            type="primary"
+            size="small"
+            :loading="signing"
+            class="home__signin-btn"
+            @click="handleQuickSignIn"
+          >📅 签到 +5</el-button>
+          <span v-else>📅 已签到 · 连续 <span class="pixel-font">{{ streakDays }}</span> 天</span>
+        </span>
       </div>
 
       <!-- 多引擎搜索框 -->
@@ -243,9 +257,51 @@ import { ArrowDown } from '@element-plus/icons-vue';
 import PixelIcon from '../components/PixelIcon.vue';
 import { useAuthStore } from '../store/authStore';
 import { getLatestNotice, type Notice } from '../api/notice';
+import { getPoints, signIn } from '../api/user';
 
 const router = useRouter();
 const authStore = useAuthStore();
+
+/* ===== 首页积分/签到（登录后顶栏徽章 + 状态条快捷签到） ===== */
+const points = ref(0);
+const level = ref('FREE');
+const signedToday = ref(false);
+const streakDays = ref(0);
+const signing = ref(false);
+
+/** 加载积分画像（登录时） */
+async function loadPoints() {
+  if (!authStore.isAuthenticated()) return;
+  try {
+    const res = await getPoints();
+    points.value = res.data?.points ?? 0;
+    level.value = res.data?.level ?? 'FREE';
+    signedToday.value = !!res.data?.signedToday;
+    streakDays.value = res.data?.streakDays ?? 0;
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+/** 状态条快捷签到（幂等） */
+async function handleQuickSignIn() {
+  signing.value = true;
+  try {
+    const res = await signIn();
+    ElMessageBox.confirm(`签到成功 +${res.data?.points ?? 0} 分${res.data?.bonus ? '（连续奖励）' : ''}，去个人中心查看明细？`, '签到成功', {
+      confirmButtonText: '查看积分',
+      cancelButtonText: '继续逛逛',
+      type: 'success',
+    })
+      .then(() => router.push('/user-center'))
+      .catch(() => {});
+    await loadPoints();
+  } catch {
+    // 拦截器已提示
+  } finally {
+    signing.value = false;
+  }
+}
 
 /* ===== 最新公告弹窗 ===== */
 const latestNotice = ref<Notice | null>(null);
@@ -466,7 +522,10 @@ onMounted(() => {
   typeLoop();
   checkNotice();
   startClock();
-  if (authStore.isAuthenticated()) authStore.fetchAvatar();
+  if (authStore.isAuthenticated()) {
+    authStore.fetchAvatar();
+    loadPoints();
+  }
 });
 onBeforeUnmount(() => {
   if (timer) clearTimeout(timer);
@@ -572,6 +631,34 @@ function dotStyle(n: number) {
 .home__user-name {
   font-size: 14px;
   color: var(--app-text);
+}
+
+/* 顶栏积分徽章 + VIP 标签 */
+.home__points-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #e6a23c;
+  background: rgba(230, 162, 60, 0.12);
+  border: 1px solid rgba(230, 162, 60, 0.35);
+  border-radius: 9999px;
+  padding: 1px 8px;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.home__points-badge:hover {
+  background: rgba(230, 162, 60, 0.2);
+}
+
+.home__vip-tag {
+  margin-left: 2px;
+}
+
+/* 状态条快捷签到 */
+.home__signin-btn {
+  padding: 0;
+  font-weight: 600;
 }
 
 .home__user-caret {
