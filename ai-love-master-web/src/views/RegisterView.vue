@@ -137,7 +137,13 @@ const form = reactive({
   email: '',
   code: '',
   agreed: false,
+  inviteCode: '',
 });
+
+// 分享裂变：通过邀请链接（/register?invite=xxx）进入时自动预填邀请码
+if (route.query.invite) {
+  form.inviteCode = String(route.query.invite);
+}
 
 /** 邮箱格式校验（简单正则） */
 const EMAIL_RE = /^[\w.-]+@[\w-]+(\.[\w-]+)+$/;
@@ -222,6 +228,7 @@ async function handleRegister() {
         email: form.email.trim(),
         code: form.code.trim(),
         agreed: form.agreed,
+        inviteCode: form.inviteCode.trim() || undefined,
       });
       ElMessage.success('注册成功，已自动登录，正在跳转…');
       const redirect = (route.query.redirect as string) || '/';

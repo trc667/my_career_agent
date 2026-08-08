@@ -91,15 +91,32 @@ public class AuthServiceImpl implements AuthService {
         // 校验邮箱验证码
         emailCodeService.validate(email, req.getCode());
 
+        // 分享裂变：解析邀请码绑定邀请人（邀请码 = 邀请人 userId；非法/不存在则静默忽略，不影响注册）
+        Long inviterId = null;
+        if (req.getInviteCode() != null && !req.getInviteCode().isBlank()) {
+            try {
+                Long codeId = Long.parseLong(req.getInviteCode().trim());
+                if (userMapper.selectById(codeId) != null) {
+                    inviterId = codeId;
+                }
+            } catch (NumberFormatException e) {
+                log.warn("非法邀请码，忽略: {}", req.getInviteCode());
+            }
+        }
+
         String encode = passwordEncoder.encode(req.getPassword());
         User user = new User();
         user.setUsername(req.getUsername());
         user.setPasswordHash(encode);
         user.setEmail(email);
         user.setRole("USER");
+        user.setInviterId(inviterId);
         user.setCreateTime(LocalDateTime.now());
         user.setUpdateTime(LocalDateTime.now());
         userMapper.insert(user);
+        if (inviterId != null) {
+            log.info("注册绑定邀请人: username={} inviterId={}", req.getUsername(), inviterId);
+        }
     }
 
     @Override

@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS app_user (
     points INT DEFAULT 0 COMMENT '积分余额',
     level VARCHAR(16) DEFAULT 'FREE' COMMENT '会员等级: FREE/VIP',
     vip_expire_at DATETIME DEFAULT NULL COMMENT 'VIP 到期时间',
+    inviter_id BIGINT DEFAULT NULL COMMENT '邀请人用户ID（分享裂变）',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_user_email (email)
@@ -74,6 +75,16 @@ PREPARE stmt6 FROM @ddl6;
 EXECUTE stmt6;
 DEALLOCATE PREPARE stmt6;
 
+-- 兼容已存在的 app_user 表：若缺少邀请人列则补充（分享裂变）
+SET @has_inviter := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'app_user' AND COLUMN_NAME = 'inviter_id');
+SET @ddl7 := IF(@has_inviter = 0,
+    'ALTER TABLE app_user ADD COLUMN inviter_id BIGINT DEFAULT NULL',
+    'SELECT 1');
+PREPARE stmt7 FROM @ddl7;
+EXECUTE stmt7;
+DEALLOCATE PREPARE stmt7;
+
 -- 积分流水表：可审计（谁/何时/为何/变了几），积分变更一律落此表
 CREATE TABLE IF NOT EXISTS point_log (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -93,6 +104,17 @@ CREATE TABLE IF NOT EXISTS sign_in (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_signin_user_date (user_id, sign_date),
     KEY idx_signin_date (sign_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 邀请奖励表：分享裂变防刷（每个邀请人-被邀人组合只奖励一次）
+CREATE TABLE IF NOT EXISTS invite_reward (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    inviter_id BIGINT NOT NULL COMMENT '邀请人',
+    invitee_id BIGINT NOT NULL COMMENT '被邀人（完成首聊后触发）',
+    points INT NOT NULL DEFAULT 0 COMMENT '奖励积分',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_invite_pair (inviter_id, invitee_id),
+    KEY idx_invite_inviter (inviter_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 意见反馈表

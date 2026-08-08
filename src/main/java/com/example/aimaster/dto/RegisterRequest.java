@@ -31,4 +31,8 @@ public class RegisterRequest {
     /** 是否已阅读并同意用户协议与隐私政策（必填 true） */
     @AssertTrue(message = "请先阅读并同意用户协议与隐私政策")
     private Boolean agreed;
+
+    /** 邀请码（分享裂变可选，填写则绑定邀请人关系） */
+    @Size(max = 32, message = "邀请码不合法")
+    private String inviteCode;
 }

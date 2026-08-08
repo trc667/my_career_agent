@@ -8,6 +8,7 @@ import com.example.aimaster.entity.Feedback;
 import com.example.aimaster.entity.User;
 import com.example.aimaster.mapper.FeedbackMapper;
 import com.example.aimaster.mapper.UserMapper;
+import com.example.aimaster.service.AchievementService;
 import com.example.aimaster.service.AuthService;
 import com.example.aimaster.service.OssStorageService;
 import com.example.aimaster.service.PointService;
@@ -38,17 +39,20 @@ public class UserController {
     private final OssStorageService ossStorageService;
     private final UserMapper userMapper;
     private final PointService pointService;
+    private final AchievementService achievementService;
 
     public UserController(AuthService authService,
                           FeedbackMapper feedbackMapper,
                           OssStorageService ossStorageService,
                           UserMapper userMapper,
-                          PointService pointService) {
+                          PointService pointService,
+                          AchievementService achievementService) {
         this.authService = authService;
         this.feedbackMapper = feedbackMapper;
         this.ossStorageService = ossStorageService;
         this.userMapper = userMapper;
         this.pointService = pointService;
+        this.achievementService = achievementService;
     }
 
     /** 获取当前登录用户名（从 SecurityContext 取，JWT 过滤器已注入） */
@@ -130,5 +134,21 @@ public class UserController {
             return Result.fail(400, "今天已经签过到啦，明天再来");
         }
         return Result.ok("签到成功", result);
+    }
+
+    /** GET /api/user/invite 邀请信息（分享裂变：邀请码/已成功邀请数/每单奖励） */
+    @GetMapping("/invite")
+    public Result<Map<String, Object>> invite() {
+        Long userId = currentUserId();
+        if (userId == null) return Result.fail(401, "未登录或账号不存在");
+        return Result.ok(pointService.inviteProfile(userId));
+    }
+
+    /** GET /api/user/achievements 成就列表（签到/对话/邀请/积分，含进度） */
+    @GetMapping("/achievements")
+    public Result<java.util.List<AchievementService.Achievement>> achievements() {
+        Long userId = currentUserId();
+        if (userId == null) return Result.fail(401, "未登录或账号不存在");
+        return Result.ok(achievementService.list(userId));
     }
 }

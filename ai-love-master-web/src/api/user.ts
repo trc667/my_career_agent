@@ -73,3 +73,26 @@ export function signIn() {
     '/api/user/sign-in',
   );
 }
+
+/** 邀请信息（分享裂变：邀请码/已成功邀请数/每单奖励） */
+export function getInvite() {
+  return http.get<any, ResultWrapper<{ inviteCode: number; invitedCount: number; rewardPoints: number }>>(
+    '/api/user/invite',
+  );
+}
+
+/** 成就条目 */
+export interface Achievement {
+  code: string;
+  name: string;
+  desc: string;
+  icon: string;
+  progress: number;
+  target: number;
+  unlocked: boolean;
+}
+
+/** 成就列表（签到/对话/邀请/积分，含进度） */
+export function getAchievements() {
+  return http.get<any, ResultWrapper<Achievement[]>>('/api/user/achievements');
+}

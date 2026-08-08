@@ -15,6 +15,8 @@ export interface RegisterRequest {
   email: string;
   code: string;
   agreed: boolean;
+  /** 分享裂变：邀请码（可选，填写则绑定邀请人） */
+  inviteCode?: string;
 }
 
 export interface AuthResponse {
