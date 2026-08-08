@@ -82,6 +82,16 @@ public class InterviewService {
     /** VIP 深度点评使用的模型 */
     private static final String DEEP_MODEL = "qwen-max";
 
+    /** 抽题后 LLM 改写 Prompt：把知识库陈述句知识点转成可直接作答的面试问句 */
+    private static final String QUESTION_REWRITE_PROMPT =
+            "你是一位资深技术面试官，正在为求职者出面试题。\n"
+            + "下面是从技术知识库抽取的 {n} 条知识点，请把每条改写成一道面试问句：\n"
+            + "1) 以问号结尾，口语化、能直接作答，引导求职者解释原理/原因/区别；\n"
+            + "2) 不要包含答案内容，顺序与输入一一对应；\n"
+            + "3) 若原文已是问句则润色后保留。\n"
+            + "知识点：\n{knowledge}\n"
+            + "只输出一个合法 JSON 数组，例如 [\"问题1\",\"问题2\"]，不要输出其他文字，不要用 ```json 包裹。";
+
     /** 单题点评结果 */
     public record Review(int totalScore, List<Dimension> dimensions, String comment, String reference) {
         public record Dimension(String name, int score, String comment) {
@@ -131,10 +141,12 @@ public class InterviewService {
         }
 
         String category = POSITION_CATEGORY.getOrDefault(req.getPosition().trim(), null);
-        List<String> questions = drawQuestions(category, QUESTION_COUNT);
-        if (questions.size() < QUESTION_COUNT) {
+        List<String> knowledge = drawQuestions(category, QUESTION_COUNT);
+        if (knowledge.size() < QUESTION_COUNT) {
             throw new BusinessException("该岗位知识不足，请换个岗位试试");
         }
+        // 知识点（陈述句）→ 面试问句（一次 LLM 调用，失败降级用原文保证可用）
+        List<String> questions = toInterviewQuestions(knowledge);
         String sessionId = UUID.randomUUID().toString();
         sessions.put(sessionId, new Session(userId, req.getPosition().trim(), questions, new ArrayList<>(), 0, vip));
         if (!vip) {
@@ -226,6 +238,34 @@ public class InterviewService {
     }
 
     // ==================== 内部实现 ====================
+
+    /** 抽题后统一 LLM 改写为面试问句；数量不匹配/调用失败时降级返回原文 */
+    private List<String> toInterviewQuestions(List<String> knowledge) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < knowledge.size(); i++) {
+                sb.append(i + 1).append(". ").append(knowledge.get(i)).append("\n");
+            }
+            String prompt = QUESTION_REWRITE_PROMPT
+                    .replace("{n}", String.valueOf(knowledge.size()))
+                    .replace("{knowledge}", sb.toString().trim());
+            org.springframework.ai.chat.model.ChatResponse response = chatModel.call(
+                    new Prompt(List.of(new SystemMessage(prompt))));
+            String raw = extractReplyText(response);
+            List<String> rewritten = objectMapper.readValue(extractJson(raw),
+                    new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+            if (rewritten != null && rewritten.size() == knowledge.size()
+                    && rewritten.stream().noneMatch(t -> t == null || t.isBlank())) {
+                log.info("面试题改写成功: {} 题", rewritten.size());
+                return rewritten;
+            }
+            log.warn("面试题改写数量不匹配({}->{})，降级用原文",
+                    knowledge.size(), rewritten == null ? 0 : rewritten.size());
+        } catch (Exception e) {
+            log.warn("面试题改写失败，降级用原文: {}", e.getMessage());
+        }
+        return knowledge;
+    }
 
     /** 从知识库按分类抽 N 道不重复的题；分类无独立知识（如测试/运维）时全库随机兜底 */
     private List<String> drawQuestions(String category, int n) {
