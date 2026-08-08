@@ -1,190 +1,127 @@
 /* ============================================================
-   像素风主题（pixel theme）
-   依赖：@fontsource/press-start-2p（main.ts 引入）+ pixelarticons（PixelIcon.vue）
-   仅做轻量点缀：像素字体/按钮/卡片/光标/背景装饰/动效，保留 --app-* 变量体系
+   商用落地风工具类（commercial theme utilities）
+   原像素风工具类更名为商用语义，类名保留（组件引用零改动）：
+   - pixel-font    → 数据数字（系统字体 + tabular-nums，不再用像素字体）
+   - pixel-btn     → 圆角主色渐变按钮（柔和阴影，替代像素硬阴影）
+   - pixel-card    → 大圆角白卡片 + 柔和阴影
+   - pixel-hover   → hover 上浮 + 阴影加深
+   - pixel-caret   → 打字机细光标（平滑闪烁）
+   - 像素装饰类（cloud/star/block/scanlines）→ 隐藏（不再使用）
    ============================================================ */
 
-/* ---------- 像素字体 ---------- */
-/* 数字/英文/品牌名点缀字体（Press Start 2P，@fontsource 提供） */
+/* ---------- 数据数字 ---------- */
 .pixel-font {
-  font-family: 'Press Start 2P', 'Courier New', monospace;
-  letter-spacing: 0.02em;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
-/* ---------- 像素设计变量 ---------- */
-:root {
-  --pixel-unit: 4px;
-  --pixel-border: 2px;
-  /* 像素硬阴影（8-bit 描边） */
-  --pixel-shadow-color: rgba(64, 158, 255, 0.55);
-}
-
-.theme-dark {
-  --pixel-shadow-color: rgba(94, 176, 255, 0.6);
-}
-
-/* ---------- 8-bit 像素按钮（配合 el-button 使用） ---------- */
+/* ---------- 商用按钮 ---------- */
 .pixel-btn {
-  border-radius: 3px !important;
-  border: 2px solid currentColor !important;
-  box-shadow: 0 var(--pixel-unit) 0 currentColor !important;
+  border-radius: 12px !important;
+  border: none !important;
+  font-weight: 600;
+  box-shadow: var(--app-shadow-sm) !important;
   transition:
-    transform 0.08s ease,
-    box-shadow 0.08s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
     filter 0.2s ease !important;
 }
 
 .pixel-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 calc(var(--pixel-unit) + 2px) 0 currentColor !important;
-  filter: brightness(1.05);
+  box-shadow: var(--app-shadow-md) !important;
+  filter: brightness(1.03);
 }
 
 .pixel-btn:active {
-  transform: translateY(var(--pixel-unit));
-  box-shadow: 0 0 0 currentColor !important;
+  transform: translateY(0);
+  box-shadow: var(--app-shadow-sm) !important;
 }
 
-/* 主要按钮：像素蓝实心 */
+/* 主要按钮：主色渐变 */
 .pixel-btn.el-button--primary {
-  box-shadow: 0 var(--pixel-unit) 0 #2f7fd6 !important;
+  background: linear-gradient(135deg, #4a8bff, #2f6bff);
+  box-shadow: 0 4px 14px rgba(47, 107, 255, 0.28) !important;
 }
 
-.pixel-btn.el-button--primary:active {
-  box-shadow: 0 0 0 #2f7fd6 !important;
+.pixel-btn.el-button--primary:hover {
+  box-shadow: 0 6px 18px rgba(47, 107, 255, 0.36) !important;
 }
 
-/* 危险（停止生成）按钮 */
 .pixel-btn.el-button--danger {
-  box-shadow: 0 var(--pixel-unit) 0 #d64040 !important;
+  background: linear-gradient(135deg, #f87171, #ef4444);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.24) !important;
 }
 
-.pixel-btn.el-button--danger:active {
-  box-shadow: 0 0 0 #d64040 !important;
-}
-
-/* ---------- 像素卡片描边 ---------- */
+/* ---------- 商用卡片 ---------- */
 .pixel-card {
-  border: var(--pixel-border) solid var(--app-border) !important;
-  border-radius: var(--app-radius-sm) !important;
-  box-shadow:
-    0 var(--pixel-unit) 0 var(--app-border),
-    0 12px 32px rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid var(--app-border) !important;
+  border-radius: var(--app-radius-lg) !important;
+  box-shadow: var(--app-shadow-md) !important;
 }
 
 .theme-dark .pixel-card {
-  box-shadow:
-    0 var(--pixel-unit) 0 rgba(255, 255, 255, 0.08),
-    0 12px 32px rgba(0, 0, 0, 0.35) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35) !important;
 }
 
-/* hover 像素高亮描边（用于卡片/列表项） */
+/* hover 上浮 + 阴影加深 */
 .pixel-hover {
   transition:
-    box-shadow 0.15s ease,
-    transform 0.15s ease,
-    border-color 0.15s ease !important;
+    box-shadow 0.18s ease,
+    transform 0.18s ease,
+    border-color 0.18s ease !important;
 }
 
 .pixel-hover:hover {
-  border-color: var(--el-color-primary) !important;
-  box-shadow:
-    var(--pixel-unit) var(--pixel-unit) 0 var(--pixel-shadow-color) !important;
-  transform: translate(-2px, -2px);
+  border-color: rgba(47, 107, 255, 0.3) !important;
+  box-shadow: var(--app-shadow-lg) !important;
+  transform: translateY(-3px);
 }
 
-/* ---------- 像素徽章 ---------- */
+/* ---------- 徽章 ---------- */
 .pixel-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 10px;
-  border: var(--pixel-border) solid currentColor;
-  border-radius: 2px;
+  padding: 3px 12px;
+  border-radius: 9999px;
   font-size: 12px;
   font-weight: 600;
-  background: var(--app-card);
-  box-shadow: 2px 2px 0 currentColor;
-  line-height: 1.4;
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+  line-height: 1.5;
 }
 
-/* ---------- 像素光标（打字机） ---------- */
+/* ---------- 打字机光标（平滑闪烁） ---------- */
 .pixel-caret {
   display: inline-block;
-  width: 3px;
+  width: 2px;
   height: 1.05em;
   margin-left: 2px;
   vertical-align: text-bottom;
   background: currentColor;
-  animation: pixel-blink 0.9s steps(1) infinite;
+  border-radius: 1px;
+  animation: pixel-blink 1s ease-in-out infinite;
 }
 
 @keyframes pixel-blink {
-  0%, 55% { opacity: 1; }
-  56%, 100% { opacity: 0; }
+  0%, 45% { opacity: 1; }
+  50%, 95% { opacity: 0; }
+  100% { opacity: 1; }
 }
 
-/* ---------- 像素装饰：背景云 / 星 / 方块 ---------- */
-.pixel-cloud {
-  position: absolute;
-  pointer-events: none;
-  opacity: 0.5;
-  /* 云由一排圆角方块组成 */
-  display: block;
-  width: 34px;
-  height: 10px;
-  background: var(--app-text-secondary);
-  border-radius: 0;
-  box-shadow:
-    8px 0 0 var(--app-text-secondary),
-    16px 0 0 var(--app-text-secondary),
-    24px 0 0 var(--app-text-secondary),
-    4px 8px 0 var(--app-text-secondary),
-    12px 8px 0 var(--app-text-secondary),
-    20px 8px 0 var(--app-text-secondary);
-  animation: pixel-float 7s ease-in-out infinite;
-}
-
-.pixel-star {
-  position: absolute;
-  pointer-events: none;
-  width: 4px;
-  height: 4px;
-  background: var(--app-text-secondary);
-  opacity: 0.7;
-  box-shadow:
-    -8px 0 0 var(--app-text-secondary),
-    8px 0 0 var(--app-text-secondary),
-    0 -8px 0 var(--app-text-secondary),
-    0 8px 0 var(--app-text-secondary);
-  animation: pixel-float 6s ease-in-out infinite;
-}
-
-.pixel-block {
-  position: absolute;
-  pointer-events: none;
-  width: 8px;
-  height: 8px;
-  background: var(--app-accent-orange);
-  opacity: 0.35;
-  box-shadow: 12px 12px 0 var(--app-accent-blue);
-  animation: pixel-float 9s ease-in-out infinite;
-}
-
-@keyframes pixel-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-/* ---------- 像素弹出 / 抖动动效 ---------- */
+/* ---------- 轻量动效 ---------- */
 @keyframes pixel-pop {
-  0% { transform: scale(0.92); }
-  60% { transform: scale(1.02); }
+  0% { transform: scale(0.96); }
+  60% { transform: scale(1.01); }
   100% { transform: scale(1); }
 }
 
 .pixel-pop {
-  animation: pixel-pop 0.18s ease-out both;
+  animation: pixel-pop 0.2s ease-out both;
 }
 
 @keyframes pixel-shake {
@@ -197,18 +134,12 @@
   animation: pixel-shake 0.25s ease-in-out;
 }
 
-/* ---------- 克制的 CRT 扫描线（低透明度，仅装饰） ---------- */
+/* ---------- 像素装饰残留：商用风不再使用，统一隐藏 ---------- */
+.pixel-cloud,
+.pixel-star,
+.pixel-block,
 .pixel-scanlines {
-  position: fixed;
-  inset: 0;
-  z-index: 999;
-  pointer-events: none;
-  opacity: 0.06;
-  background: repeating-linear-gradient(
-    0deg,
-    #000 0 1px,
-    transparent 1px 3px
-  );
+  display: none !important;
 }
 
 /* ---------- 触屏 / 减弱动画偏好 ---------- */
@@ -221,9 +152,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pixel-caret,
-  .pixel-cloud,
-  .pixel-star,
-  .pixel-block,
   .pixel-pop,
   .pixel-shake {
     animation: none !important;

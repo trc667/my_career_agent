@@ -1,14 +1,16 @@
-/* 全局样式：统一设计变量、响应式、PC/移动端兼容 */
+/* 全局样式：商用落地风设计体系 —— 单主色 + 大面积留白 + 大圆角卡片 + 柔和渐变 */
+/* 设计 token 统一于此，全站组件随变量自动适配（明暗双主题） */
 
 :root {
-  --app-bg: #f0f2f5;
-  --app-bg-deep: #e8ebf0;
-  --app-text: #303133;
-  --app-text-secondary: #909399;
-  --app-border: #e4e7ed;
+  /* 背景：冷白到浅蓝柔和渐变（大面积留白） */
+  --app-bg: #f6f9fc;
+  --app-bg-deep: #eef3fa;
+  --app-text: #1f2733;
+  --app-text-secondary: #7a8699;
+  --app-border: #eef1f6;
   --app-card: #ffffff;
 
-  /* 统一间距 */
+  /* 统一间距（留白偏大，信息更透气） */
   --app-space-xs: 4px;
   --app-space-sm: 8px;
   --app-space-md: 12px;
@@ -16,36 +18,57 @@
   --app-space-xl: 24px;
   --app-space-2xl: 40px;
 
-  /* 圆角（中等圆角，配合像素风降低"AI 味"大圆角） */
-  --app-radius-sm: 6px;
-  --app-radius-md: 10px;
-  --app-radius-lg: 14px;
+  /* 大圆角卡片（商用落地风） */
+  --app-radius-sm: 10px;
+  --app-radius-md: 16px;
+  --app-radius-lg: 24px;
 
-  /* 响应式断点（配合媒体查询使用） */
+  /* 柔和多层阴影（替代像素硬描边） */
+  --app-shadow-sm: 0 1px 3px rgba(31, 39, 51, 0.05), 0 1px 2px rgba(31, 39, 51, 0.04);
+  --app-shadow-md: 0 4px 12px rgba(31, 39, 51, 0.06), 0 2px 4px rgba(31, 39, 51, 0.04);
+  --app-shadow-lg: 0 12px 32px rgba(31, 39, 51, 0.08), 0 4px 12px rgba(31, 39, 51, 0.05);
+
+  /* 响应式断点 */
   --app-sidebar-width: 280px;
-  --app-content-max: 900px;
+  --app-content-max: 1024px;
 
-  /* 聊天气泡：用户=中性灰蓝，AI=浅蓝 */
-  --chat-user-bg: #f0f2f5;
-  --chat-assistant-bg: #f0f7ff;
-  --chat-assistant-border: rgba(64, 158, 255, 0.25);
+  /* 聊天气泡：用户=中性灰白，AI=主色浅渐变 */
+  --chat-user-bg: #f2f5f9;
+  --chat-assistant-bg: linear-gradient(135deg, #f3f7ff, #eaf1ff);
+  --chat-assistant-border: rgba(47, 107, 255, 0.14);
 
-  /* 强调色（卡片点缀） */
-  --app-accent-orange: rgb(255, 170, 92);
-  --app-accent-red: rgb(255, 92, 92);
-  --app-accent-blue: rgb(64, 158, 255);
+  /* 单主色（商业蓝）+ 极少量功能色 */
+  --app-primary: #2f6bff;
+  --app-primary-hover: #2458e0;
+  --app-primary-soft: #e8f0ff;
+  --app-accent-blue: #2f6bff;
+  --app-accent-orange: #f59e0b;
+  --app-accent-red: #ef4444;
+  --app-accent-green: #16a34a;
+
+  /* Element Plus 主色覆盖：全局按钮/标签/输入聚焦跟随商用蓝 */
+  --el-color-primary: #2f6bff;
+  --el-color-primary-light-3: #5f8dff;
+  --el-color-primary-light-5: #8facff;
+  --el-color-primary-light-7: #bccdff;
+  --el-color-primary-light-8: #d3deff;
+  --el-color-primary-light-9: #e8f0ff;
+  --el-color-primary-dark-2: #2458e0;
 }
 
 .theme-dark {
-  --app-bg: #121417;
-  --app-bg-deep: #0d0f12;
-  --app-text: #e5eaf3;
-  --app-text-secondary: #8f9bb3;
-  --app-border: #2c323d;
-  --app-card: #1a1e26;
-  --chat-user-bg: rgba(64, 158, 255, 0.15);
-  --chat-assistant-bg: rgba(64, 158, 255, 0.08);
-  --chat-assistant-border: rgba(64, 158, 255, 0.3);
+  --app-bg: #0f1420;
+  --app-bg-deep: #0b0f18;
+  --app-text: #e6ebf4;
+  --app-text-secondary: #8b96ab;
+  --app-border: #232c3d;
+  --app-card: #161d2b;
+  --chat-user-bg: #1e2736;
+  --chat-assistant-bg: linear-gradient(135deg, #18233a, #14203a);
+  --chat-assistant-border: rgba(47, 107, 255, 0.35);
+  --app-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.25);
+  --app-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --app-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 html {
@@ -60,34 +83,34 @@ body,
 
 body {
   margin: 0;
-  background: var(--app-bg);
+  background: linear-gradient(180deg, var(--app-bg) 0%, var(--app-bg-deep) 100%);
   color: var(--app-text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
-  /* 防止装饰元素（光斑等）在窄屏造成横向滚动 */
+  /* 防止装饰元素在窄屏造成横向滚动 */
   overflow-x: hidden;
 }
 
-/* 键盘焦点可见（无障碍）：焦点时显示像素风格高亮 */
+/* 键盘焦点可见（无障碍） */
 :focus-visible {
-  outline: 2px solid var(--el-color-primary, #409eff);
+  outline: 2px solid var(--app-primary, #2f6bff);
   outline-offset: 2px;
-  border-radius: 3px;
+  border-radius: 6px;
 }
 
 * {
   box-sizing: border-box;
 }
 
-/* ===== 通用动效工具类（首页 / 登录页共用） ===== */
+/* ===== 通用动效工具类 ===== */
 @keyframes app-float {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12px); }
+  50% { transform: translateY(-10px); }
 }
 
 @keyframes app-fade-up {
-  from { opacity: 0; transform: translateY(24px); }
+  from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -100,28 +123,28 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* 背景装饰：柔和光斑（保留但降低透明度，配合像素装饰使用，弱化 AI 味） */
+/* 背景装饰：柔和光斑（低透明度，营造柔和渐变氛围） */
 .app-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(60px);
+  filter: blur(70px);
   pointer-events: none;
-  animation: app-float 8s ease-in-out infinite;
+  animation: app-float 9s ease-in-out infinite;
 }
 
 .app-orb--blue {
-  background: rgba(64, 158, 255, 0.14);
+  background: rgba(47, 107, 255, 0.08);
 }
 
 .app-orb--orange {
-  background: rgba(230, 162, 60, 0.13);
+  background: rgba(245, 158, 11, 0.06);
 }
 
 .app-orb--purple {
-  background: rgba(114, 100, 240, 0.12);
+  background: rgba(114, 100, 240, 0.06);
 }
 
-/* ===== 页面切换过渡（路由跳转） ===== */
+/* ===== 页面切换过渡 ===== */
 .page-enter-active,
 .page-leave-active {
   transition: opacity 0.28s ease, transform 0.28s ease;
@@ -129,34 +152,45 @@ body {
 
 .page-enter-from {
   opacity: 0;
-  transform: translateY(16px);
+  transform: translateY(14px);
 }
 
 .page-leave-to {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-8px);
 }
 
-/* 响应式工具类（供组件引用） */
+/* 通用卡片（商用风：白底 + 浅边框 + 柔和阴影 + 大圆角） */
+.app-card {
+  background: var(--app-card);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-md);
+}
+
+/* 数据统计数字：表格数字（tabular-nums）防跳动 */
+.app-num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* 响应式工具类 */
 @media (max-width: 767px) {
   html {
     font-size: 15px;
   }
 
-  /* 弹窗自适应：手机端不超过屏幕宽度，且顶部留出安全距离 */
   .el-dialog {
     max-width: 92vw !important;
     margin-top: 6vh !important;
   }
 
-  /* 弹窗内容超高时可内部滚动，避免撑出屏幕 */
   .el-dialog .el-dialog__body {
     max-height: 60vh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 
-  /* 弹窗内表单：label 移到顶部，避免 80/90px 的 label 挤占输入框 */
   .el-dialog .el-form-item {
     display: flex;
     flex-direction: column;
@@ -176,27 +210,23 @@ body {
     margin-left: 0 !important;
   }
 
-  /* 弹窗底部按钮组：手机上允许换行，避免按钮溢出 */
   .el-dialog__footer {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
   }
 
-  /* Element Plus 消息确认框同样限宽 */
   .el-message-box {
     max-width: 92vw !important;
   }
 }
 
-/* ===== 触屏设备优化（无 hover） ===== */
+/* ===== 触屏设备优化 ===== */
 @media (hover: none) {
-  /* 隐藏依赖 hover 的提示 */
   .app-card__hint {
     display: none;
   }
 
-  /* 触屏上禁止 3D 翻转残留，点击直接进入 */
   .app-card:hover .app-card__inner {
     transform: none;
   }

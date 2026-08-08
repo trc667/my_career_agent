@@ -130,6 +130,22 @@ async function copyMessage(m: ChatMessage) {
   gap: 12px;
 }
 
+/* 新消息弹入动效（商用风：轻微上浮 + 缩放，弹性收尾） */
+.chat-list__item {
+  animation: msg-in 0.32s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .chat-list__item {
   display: flex;
   gap: 10px;

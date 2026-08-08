@@ -28,7 +28,7 @@
         <div class="uc-points__top">
           <div class="uc-points__left">
             <span class="uc-points__label">积分余额</span>
-            <span class="uc-points__value">{{ pointProfile.points }}</span>
+            <span class="uc-points__value">{{ displayedPoints }}</span>
             <el-tag :type="pointProfile.level === 'VIP' ? 'warning' : 'info'" size="small" effect="dark">
               {{ pointProfile.level === 'VIP' ? 'VIP 会员' : '免费用户' }}
             </el-tag>
@@ -40,6 +40,14 @@
             {{ pointProfile.signedToday ? `已签到 · 连续 ${pointProfile.streakDays} 天` : '每日签到' }}
           </el-button>
         </div>
+        <!-- 签到 7 天周期进度（第 7 天解锁 +10 奖励） -->
+        <div v-if="pointProfile.streakDays > 0" class="uc-points__streak">
+          <div class="uc-points__streak-head">
+            <span>连续 {{ pointProfile.streakDays }} 天</span>
+            <span>本周第 {{ streakInCycle }}/7 天 · 再签 {{ remainToBonus }} 天解锁 +10</span>
+          </div>
+          <el-progress :percentage="streakPct" :stroke-width="8" :show-text="false" color="#2f6bff" />
+        </div>
         <div v-if="pointProfile.logs?.length" class="uc-points__logs">
           <div v-for="log in pointProfile.logs" :key="log.id" class="uc-points__log">
             <span class="uc-points__log-reason">{{ log.reason }}</span>
@@ -49,7 +57,41 @@
             <span class="uc-points__log-time">{{ formatTime(log.createTime) }}</span>
           </div>
         </div>
-        <p class="uc-points__tip">每日签到 +5 分，连续 7 天额外 +10；点赞 AI 回复 +2 分</p>
+        <p class="uc-points__tip">每日签到 +5 分，连续 7 天额外 +10；点赞 AI 回复 +2 分；对话消耗 1 分/次</p>
+      </div>
+
+      <!-- 成就徽章（留存游戏化） -->
+      <div v-if="achievements.length" class="uc-achv">
+        <h3 class="uc-achv__title">🏅 成就徽章</h3>
+        <div class="uc-achv__grid">
+          <div
+            v-for="a in achievements"
+            :key="a.code"
+            class="uc-achv__item"
+            :class="{ 'is-locked': !a.unlocked }"
+            :title="a.desc"
+          >
+            <span class="uc-achv__icon">{{ a.icon }}</span>
+            <span class="uc-achv__name">{{ a.name }}</span>
+            <span class="uc-achv__prog">{{ a.unlocked ? '✓' : `${a.progress}/${a.target}` }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 邀请好友（分享裂变） -->
+      <div class="uc-invite">
+        <h3 class="uc-invite__title">🎁 邀请好友赚积分</h3>
+        <p class="uc-invite__desc">
+          每邀请 1 位好友注册并完成首次对话，你可得 <b>+{{ inviteInfo.rewardPoints }} 积分</b>
+          <span v-if="inviteInfo.invitedCount > 0" class="uc-invite__count">（已成功 {{ inviteInfo.invitedCount }} 人）</span>
+        </p>
+        <div class="uc-invite__body">
+          <img v-if="qrDataUrl" :src="qrDataUrl" alt="邀请二维码" class="uc-invite__qr" />
+          <div class="uc-invite__right">
+            <el-input :model-value="inviteLink" readonly size="small" class="uc-invite__link" />
+            <el-button type="primary" size="small" class="uc-invite__copy" @click="copyInviteLink">复制链接</el-button>
+          </div>
+        </div>
       </div>
 
       <el-divider />
@@ -116,19 +158,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import {
-  changePassword,
-  getPoints,
-  getUserMe,
-  signIn,
-  uploadAvatar,
-  type PointProfile,
-  type UserInfo,
-} from '../api/user';
+import { changePassword, getAchievements, getInvite, getPoints, getUserMe, signIn, uploadAvatar, type Achievement, type PointProfile, type UserInfo } from '../api/user';
+import QRCode from 'qrcode';
+import { useCountUp } from '../composables/useCountUp';
 import { useAuthStore } from '../store/authStore';
 
 const router = useRouter();
@@ -139,6 +175,60 @@ const formRef = ref<FormInstance>();
 const saving = ref(false);
 const signing = ref(false);
 const pointProfile = reactive<PointProfile>({ points: 0, level: 'FREE', signedToday: false, streakDays: 0, logs: [] });
+
+/* 积分数字滚动 + 签到 7 天周期进度 */
+const displayedPoints = useCountUp(computed(() => pointProfile.points));
+const streakInCycle = computed(() => {
+  const d = pointProfile.streakDays % 7;
+  return d === 0 ? 7 : d;
+});
+const remainToBonus = computed(() => 7 - streakInCycle.value);
+const streakPct = computed(() => Math.round((streakInCycle.value / 7) * 100));
+
+/* 成就徽章 */
+const achievements = ref<Achievement[]>([]);
+
+async function loadAchievements() {
+  try {
+    const res = await getAchievements();
+    achievements.value = res.data ?? [];
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+/* 分享裂变：邀请好友 */
+const inviteInfo = reactive({ inviteCode: 0, invitedCount: 0, rewardPoints: 0 });
+const inviteLink = ref('');
+const qrDataUrl = ref('');
+
+/** 加载邀请信息 + 生成二维码 */
+async function loadInvite() {
+  try {
+    const res = await getInvite();
+    inviteInfo.inviteCode = res.data?.inviteCode ?? 0;
+    inviteInfo.invitedCount = res.data?.invitedCount ?? 0;
+    inviteInfo.rewardPoints = res.data?.rewardPoints ?? 0;
+    if (inviteInfo.inviteCode) {
+      inviteLink.value = `${window.location.origin}/register?invite=${inviteInfo.inviteCode}`;
+      QRCode.toDataURL(inviteLink.value, { width: 120, margin: 1 }).then((url) => {
+        qrDataUrl.value = url;
+      });
+    }
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+/** 复制邀请链接 */
+async function copyInviteLink() {
+  try {
+    await navigator.clipboard.writeText(inviteLink.value);
+    ElMessage.success('邀请链接已复制，快去分享给好友吧');
+  } catch {
+    ElMessage.error('复制失败，请手动复制');
+  }
+}
 
 const form = reactive({
   oldPassword: '',
@@ -211,6 +301,8 @@ onMounted(async () => {
     // 401 由 http 拦截器统一处理
   }
   loadPoints();
+  loadInvite();
+  loadAchievements();
 });
 
 /** 上传/更换头像（el-upload 自定义请求） */
@@ -415,6 +507,148 @@ function handleLogout() {
   margin: 10px 0 0;
   font-size: 11px;
   color: var(--app-text-secondary);
+}
+
+/* 签到 7 天周期进度 */
+.uc-points__streak {
+  margin-top: 12px;
+}
+
+.uc-points__streak-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--app-text-secondary);
+  margin-bottom: 6px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 成就徽章墙 */
+.uc-achv {
+  background: linear-gradient(135deg, rgba(47, 107, 255, 0.06), rgba(245, 158, 11, 0.05));
+  border: 1px solid rgba(47, 107, 255, 0.14);
+  border-radius: var(--app-radius-md);
+  padding: 14px 16px;
+  margin-bottom: var(--app-space-lg);
+}
+
+.uc-achv__title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--app-text);
+}
+
+.uc-achv__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px;
+}
+
+.uc-achv__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  background: var(--app-card);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  box-shadow: var(--app-shadow-sm);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.uc-achv__item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--app-shadow-md);
+}
+
+.uc-achv__item.is-locked {
+  opacity: 0.55;
+  filter: grayscale(0.5);
+}
+
+.uc-achv__icon {
+  font-size: 22px;
+}
+
+.uc-achv__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--app-text);
+  text-align: center;
+}
+
+.uc-achv__prog {
+  font-size: 11px;
+  color: var(--app-text-secondary);
+}
+
+.uc-achv__item:not(.is-locked) .uc-achv__prog {
+  color: var(--app-accent-green);
+  font-weight: 700;
+}
+
+/* 邀请好友卡片 */
+.uc-invite {
+  background: linear-gradient(135deg, rgba(255, 180, 64, 0.08), rgba(64, 158, 255, 0.06));
+  border: 1px solid rgba(255, 180, 64, 0.2);
+  border-radius: var(--app-radius-md);
+  padding: 14px 16px;
+  margin-bottom: var(--app-space-lg);
+}
+
+.uc-invite__title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--app-text);
+}
+
+.uc-invite__desc {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+
+.uc-invite__desc b {
+  color: #e6a23c;
+}
+
+.uc-invite__count {
+  color: #67c23a;
+}
+
+.uc-invite__body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.uc-invite__qr {
+  width: 96px;
+  height: 96px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.uc-invite__right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+}
+
+.uc-invite__link {
+  flex: 1;
+  min-width: 0;
+}
+
+.uc-invite__copy {
+  flex-shrink: 0;
 }
 
 .uc-form :deep(.el-input__wrapper) {

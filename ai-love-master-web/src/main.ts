@@ -11,8 +11,6 @@ import { initErrorMonitor } from './utils/errorMonitor';
 import './styles/global.css';
 import './styles/chat-layout.css';
 import './styles/pixel.css';
-// 像素字体（Press Start 2P，拉丁/数字）
-import '@fontsource/press-start-2p/400.css';
 
 const app = createApp(App);
 const pinia = createPinia();
