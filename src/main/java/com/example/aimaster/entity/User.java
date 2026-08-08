@@ -44,6 +44,18 @@ public class User {
     @TableField("avatar")
     private String avatar;
 
+    /** 积分余额（签到/反馈/邀请奖励累计） */
+    @TableField("points")
+    private Integer points;
+
+    /** 会员等级：FREE / VIP（默认 FREE） */
+    @TableField("level")
+    private String level;
+
+    /** VIP 到期时间（到期后回落到 FREE） */
+    @TableField("vip_expire_at")
+    private LocalDateTime vipExpireAt;
+
     @TableField("created_at")
     private LocalDateTime createTime;
 

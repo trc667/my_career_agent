@@ -42,3 +42,34 @@ export function uploadAvatar(file: File) {
 export function getAiAvatar() {
   return http.get<any, ResultWrapper<{ avatar: string }>>('/api/config/ai-avatar');
 }
+
+/* 积分/会员（商业化） */
+
+export interface PointLogItem {
+  id: number;
+  userId: number;
+  changePoints: number;
+  reason: string;
+  createTime?: string;
+}
+
+export interface PointProfile {
+  points: number;
+  level: string;
+  vipExpireAt?: string;
+  signedToday: boolean;
+  streakDays: number;
+  logs?: PointLogItem[];
+}
+
+/** 积分画像（余额/等级/签到状态/连续天数/流水） */
+export function getPoints() {
+  return http.get<any, ResultWrapper<PointProfile>>('/api/user/points');
+}
+
+/** 每日签到（幂等） */
+export function signIn() {
+  return http.post<any, ResultWrapper<{ points: number; streakDays: number; bonus: boolean }>>(
+    '/api/user/sign-in',
+  );
+}

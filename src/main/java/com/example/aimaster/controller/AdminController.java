@@ -3,7 +3,9 @@ package com.example.aimaster.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.aimaster.dto.AnnouncementRequest;
 import com.example.aimaster.dto.KnowledgeRequest;
+import com.example.aimaster.dto.PointRequest;
 import com.example.aimaster.dto.Result;
+import com.example.aimaster.dto.VipRequest;
 import com.example.aimaster.entity.Announcement;
 import com.example.aimaster.entity.Feedback;
 import com.example.aimaster.entity.User;
@@ -14,6 +16,7 @@ import com.example.aimaster.mapper.UserMapper;
 import com.example.aimaster.service.OssStorageService;
 import com.example.aimaster.service.ErrorLogService;
 import com.example.aimaster.service.KnowledgeService;
+import com.example.aimaster.service.PointService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,19 +48,22 @@ public class AdminController {
     private final OssStorageService ossStorageService;
     private final ErrorLogService errorLogService;
     private final KnowledgeService knowledgeService;
+    private final PointService pointService;
 
     public AdminController(AnnouncementMapper announcementMapper,
                            FeedbackMapper feedbackMapper,
                            UserMapper userMapper,
                            OssStorageService ossStorageService,
                            ErrorLogService errorLogService,
-                           KnowledgeService knowledgeService) {
+                           KnowledgeService knowledgeService,
+                           PointService pointService) {
         this.announcementMapper = announcementMapper;
         this.feedbackMapper = feedbackMapper;
         this.userMapper = userMapper;
         this.ossStorageService = ossStorageService;
         this.errorLogService = errorLogService;
         this.knowledgeService = knowledgeService;
+        this.pointService = pointService;
     }
 
     /* ===== 公告管理 ===== */
@@ -219,5 +225,21 @@ public class AdminController {
     @GetMapping("/knowledge/rebuild-status")
     public Result<Map<String, Object>> rebuildStatus() {
         return Result.ok(knowledgeService.rebuildStatus());
+    }
+
+    /* ===== 积分/会员（商业化起步，管理员手动操作） ===== */
+
+    /** POST /api/admin/points 发放/扣减用户积分（写流水可审计） */
+    @PostMapping("/points")
+    public Result<Void> changePoints(@Valid @RequestBody PointRequest req) {
+        pointService.adminChange(req.getUserId(), req.getDelta(), req.getReason());
+        return Result.ok("积分已更新", null);
+    }
+
+    /** POST /api/admin/vip 开通/续期 VIP（按天，从当前或现有到期时间起算） */
+    @PostMapping("/vip")
+    public Result<Void> grantVip(@Valid @RequestBody VipRequest req) {
+        pointService.grantVip(req.getUsername(), req.getDays());
+        return Result.ok("VIP 已开通", null);
     }
 }

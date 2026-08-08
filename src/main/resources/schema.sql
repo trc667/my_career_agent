@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS app_user (
     email VARCHAR(128) DEFAULT NULL,
     role VARCHAR(16) DEFAULT 'USER',
     avatar VARCHAR(512) DEFAULT NULL,
+    points INT DEFAULT 0 COMMENT '积分余额',
+    level VARCHAR(16) DEFAULT 'FREE' COMMENT '会员等级: FREE/VIP',
+    vip_expire_at DATETIME DEFAULT NULL COMMENT 'VIP 到期时间',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_user_email (email)
@@ -42,6 +45,55 @@ SET @ddl3 := IF(@has_avatar = 0,
 PREPARE stmt3 FROM @ddl3;
 EXECUTE stmt3;
 DEALLOCATE PREPARE stmt3;
+
+-- 兼容已存在的 app_user 表：若缺少积分/等级/VIP 到期列则补充（积分会员体系）
+SET @has_points := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'app_user' AND COLUMN_NAME = 'points');
+SET @ddl4 := IF(@has_points = 0,
+    'ALTER TABLE app_user ADD COLUMN points INT DEFAULT 0',
+    'SELECT 1');
+PREPARE stmt4 FROM @ddl4;
+EXECUTE stmt4;
+DEALLOCATE PREPARE stmt4;
+
+SET @has_level := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'app_user' AND COLUMN_NAME = 'level');
+SET @ddl5 := IF(@has_level = 0,
+    'ALTER TABLE app_user ADD COLUMN level VARCHAR(16) DEFAULT ''FREE''',
+    'SELECT 1');
+PREPARE stmt5 FROM @ddl5;
+EXECUTE stmt5;
+DEALLOCATE PREPARE stmt5;
+
+SET @has_vip := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'app_user' AND COLUMN_NAME = 'vip_expire_at');
+SET @ddl6 := IF(@has_vip = 0,
+    'ALTER TABLE app_user ADD COLUMN vip_expire_at DATETIME DEFAULT NULL',
+    'SELECT 1');
+PREPARE stmt6 FROM @ddl6;
+EXECUTE stmt6;
+DEALLOCATE PREPARE stmt6;
+
+-- 积分流水表：可审计（谁/何时/为何/变了几），积分变更一律落此表
+CREATE TABLE IF NOT EXISTS point_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    change_points INT NOT NULL COMMENT '正数增加/负数扣减',
+    reason VARCHAR(128) NOT NULL COMMENT '如: 每日签到/聊天点赞/邀请奖励',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_point_user (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 每日签到表：同用户同日唯一（幂等），points 为当日获得积分
+CREATE TABLE IF NOT EXISTS sign_in (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    sign_date DATE NOT NULL,
+    points INT NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_signin_user_date (user_id, sign_date),
+    KEY idx_signin_date (sign_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 意见反馈表
 CREATE TABLE IF NOT EXISTS feedback (

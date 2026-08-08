@@ -22,12 +22,14 @@ public class ChatFeedbackService {
     private static final Logger log = LoggerFactory.getLogger(ChatFeedbackService.class);
 
     private final ChatFeedbackMapper feedbackMapper;
+    private final PointService pointService;
 
-    public ChatFeedbackService(ChatFeedbackMapper feedbackMapper) {
+    public ChatFeedbackService(ChatFeedbackMapper feedbackMapper, PointService pointService) {
         this.feedbackMapper = feedbackMapper;
+        this.pointService = pointService;
     }
 
-    /** 保存/切换反馈（失败只打日志不影响主流程） */
+    /** 保存/切换反馈（失败只打日志不影响主流程）；首次点赞奖励 2 积分 */
     public void save(Long userId, ChatFeedbackRequest req) {
         try {
             ChatFeedback existing = feedbackMapper.selectOne(new LambdaQueryWrapper<ChatFeedback>()
@@ -45,6 +47,14 @@ public class ChatFeedbackService {
                     .feedbackType(req.getFeedbackType())
                     .createTime(LocalDateTime.now())
                     .build());
+            // 首次点赞奖励积分（切换类型不重复发；点赞失败不阻塞主流程）
+            if ("up".equals(req.getFeedbackType())) {
+                try {
+                    pointService.addPoints(userId, 2, "聊天点赞");
+                } catch (Exception e) {
+                    log.warn("点赞积分发放失败: {}", e.getMessage());
+                }
+            }
         } catch (Exception e) {
             log.warn("问答反馈保存失败: {}", e.getMessage());
         }

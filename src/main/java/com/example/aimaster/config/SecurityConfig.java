@@ -1,6 +1,7 @@
 package com.example.aimaster.config;
 
 import com.example.aimaster.security.JwtAuthenticationFilter;
+import com.example.aimaster.security.RateLimitByLevelFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpStatus;
 import org.springframework.context.annotation.Configuration;
@@ -24,9 +25,12 @@ import java.nio.charset.StandardCharsets;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final RateLimitByLevelFilter rateLimitByLevelFilter;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          RateLimitByLevelFilter rateLimitByLevelFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.rateLimitByLevelFilter = rateLimitByLevelFilter;
     }
 
     @Bean
@@ -53,7 +57,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // 分级限流：在 JWT 认证之后按用户等级限流（VIP/FREE/游客），LLM 聊天路径生效
+                .addFilterAfter(rateLimitByLevelFilter, JwtAuthenticationFilter.class);
         return http.build();
     }
 }

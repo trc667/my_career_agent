@@ -23,6 +23,37 @@
 
       <el-divider />
 
+      <!-- 积分与会员 -->
+      <div class="uc-points">
+        <div class="uc-points__top">
+          <div class="uc-points__left">
+            <span class="uc-points__label">积分余额</span>
+            <span class="uc-points__value">{{ pointProfile.points }}</span>
+            <el-tag :type="pointProfile.level === 'VIP' ? 'warning' : 'info'" size="small" effect="dark">
+              {{ pointProfile.level === 'VIP' ? 'VIP 会员' : '免费用户' }}
+            </el-tag>
+            <span v-if="pointProfile.level === 'VIP' && pointProfile.vipExpireAt" class="uc-points__vip-expire">
+              到期 {{ formatTime(pointProfile.vipExpireAt) }}
+            </span>
+          </div>
+          <el-button type="primary" round :disabled="pointProfile.signedToday" :loading="signing" @click="handleSignIn">
+            {{ pointProfile.signedToday ? `已签到 · 连续 ${pointProfile.streakDays} 天` : '每日签到' }}
+          </el-button>
+        </div>
+        <div v-if="pointProfile.logs?.length" class="uc-points__logs">
+          <div v-for="log in pointProfile.logs" :key="log.id" class="uc-points__log">
+            <span class="uc-points__log-reason">{{ log.reason }}</span>
+            <span class="uc-points__log-delta" :class="log.changePoints > 0 ? 'is-plus' : 'is-minus'">
+              {{ log.changePoints > 0 ? '+' : '' }}{{ log.changePoints }}
+            </span>
+            <span class="uc-points__log-time">{{ formatTime(log.createTime) }}</span>
+          </div>
+        </div>
+        <p class="uc-points__tip">每日签到 +5 分，连续 7 天额外 +10；点赞 AI 回复 +2 分</p>
+      </div>
+
+      <el-divider />
+
       <h2 class="uc-section-title">修改密码</h2>
       <el-form
         ref="formRef"
@@ -89,7 +120,15 @@ import { onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import { changePassword, getUserMe, uploadAvatar, type UserInfo } from '../api/user';
+import {
+  changePassword,
+  getPoints,
+  getUserMe,
+  signIn,
+  uploadAvatar,
+  type PointProfile,
+  type UserInfo,
+} from '../api/user';
 import { useAuthStore } from '../store/authStore';
 
 const router = useRouter();
@@ -98,6 +137,8 @@ const authStore = useAuthStore();
 const info = reactive<UserInfo>({ id: 0, username: '', createTime: '', avatar: '' });
 const formRef = ref<FormInstance>();
 const saving = ref(false);
+const signing = ref(false);
+const pointProfile = reactive<PointProfile>({ points: 0, level: 'FREE', signedToday: false, streakDays: 0, logs: [] });
 
 const form = reactive({
   oldPassword: '',
@@ -125,6 +166,40 @@ const rules: FormRules = {
   ],
 };
 
+function formatTime(t?: string) {
+  if (!t) return '';
+  return String(t).slice(0, 19).replace('T', ' ');
+}
+
+/** 加载积分画像 */
+async function loadPoints() {
+  try {
+    const res = await getPoints();
+    pointProfile.points = res.data?.points ?? 0;
+    pointProfile.level = res.data?.level ?? 'FREE';
+    pointProfile.vipExpireAt = res.data?.vipExpireAt;
+    pointProfile.signedToday = !!res.data?.signedToday;
+    pointProfile.streakDays = res.data?.streakDays ?? 0;
+    pointProfile.logs = res.data?.logs ?? [];
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+/** 每日签到（幂等） */
+async function handleSignIn() {
+  signing.value = true;
+  try {
+    const res = await signIn();
+    ElMessage.success(`签到成功 +${res.data?.points ?? 0} 分${res.data?.bonus ? '（连续奖励）' : ''}`);
+    await loadPoints();
+  } catch {
+    // 拦截器已提示
+  } finally {
+    signing.value = false;
+  }
+}
+
 onMounted(async () => {
   try {
     const res = await getUserMe();
@@ -135,6 +210,7 @@ onMounted(async () => {
   } catch {
     // 401 由 http 拦截器统一处理
   }
+  loadPoints();
 });
 
 /** 上传/更换头像（el-upload 自定义请求） */
@@ -251,6 +327,94 @@ function handleLogout() {
   font-size: 16px;
   font-weight: 700;
   color: var(--app-text);
+}
+
+/* 积分与会员卡片 */
+.uc-points {
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.08), rgba(255, 180, 64, 0.06));
+  border: 1px solid rgba(64, 158, 255, 0.18);
+  border-radius: var(--app-radius-md);
+  padding: 14px 16px;
+  margin-bottom: var(--app-space-lg);
+}
+
+.uc-points__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.uc-points__left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.uc-points__label {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+
+.uc-points__value {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--app-accent-blue);
+}
+
+.uc-points__vip-expire {
+  font-size: 12px;
+  color: #b88230;
+}
+
+.uc-points__logs {
+  margin-top: 12px;
+  max-height: 180px;
+  overflow-y: auto;
+  border-top: 1px dashed var(--app-border);
+  padding-top: 8px;
+}
+
+.uc-points__log {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.uc-points__log-reason {
+  flex: 1;
+  color: var(--app-text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uc-points__log-delta {
+  font-weight: 700;
+}
+
+.uc-points__log-delta.is-plus {
+  color: #67c23a;
+}
+
+.uc-points__log-delta.is-minus {
+  color: var(--app-accent-red);
+}
+
+.uc-points__log-time {
+  color: var(--app-text-secondary);
+  flex-shrink: 0;
+}
+
+.uc-points__tip {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--app-text-secondary);
 }
 
 .uc-form :deep(.el-input__wrapper) {
