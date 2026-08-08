@@ -12,6 +12,7 @@ import com.example.aimaster.service.AchievementService;
 import com.example.aimaster.service.AuthService;
 import com.example.aimaster.service.OssStorageService;
 import com.example.aimaster.service.PointService;
+import com.example.aimaster.service.WeeklyReportService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -40,19 +41,22 @@ public class UserController {
     private final UserMapper userMapper;
     private final PointService pointService;
     private final AchievementService achievementService;
+    private final WeeklyReportService weeklyReportService;
 
     public UserController(AuthService authService,
                           FeedbackMapper feedbackMapper,
                           OssStorageService ossStorageService,
                           UserMapper userMapper,
                           PointService pointService,
-                          AchievementService achievementService) {
+                          AchievementService achievementService,
+                          WeeklyReportService weeklyReportService) {
         this.authService = authService;
         this.feedbackMapper = feedbackMapper;
         this.ossStorageService = ossStorageService;
         this.userMapper = userMapper;
         this.pointService = pointService;
         this.achievementService = achievementService;
+        this.weeklyReportService = weeklyReportService;
     }
 
     /** 获取当前登录用户名（从 SecurityContext 取，JWT 过滤器已注入） */
@@ -150,5 +154,13 @@ public class UserController {
         Long userId = currentUserId();
         if (userId == null) return Result.fail(401, "未登录或账号不存在");
         return Result.ok(achievementService.list(userId));
+    }
+
+    /** GET /api/user/weekly-report 学习周报（本周一 00:00 起聚合对话/签到/错题/积分/成就） */
+    @GetMapping("/weekly-report")
+    public Result<Map<String, Object>> weeklyReport() {
+        Long userId = currentUserId();
+        if (userId == null) return Result.fail(401, "未登录或账号不存在");
+        return Result.ok(weeklyReportService.weekly(userId));
     }
 }

@@ -96,3 +96,18 @@ export interface Achievement {
 export function getAchievements() {
   return http.get<any, ResultWrapper<Achievement[]>>('/api/user/achievements');
 }
+
+/** 学习周报（本周聚合：对话/签到/错题/积分/成就） */
+export interface WeeklyReport {
+  week: string;
+  conversation: { count: number; topics: string[] };
+  learning: { signDays: number; checkinDays: number; newWrong: number; masteredWrong: number };
+  output: { resumeReviews: number };
+  points: { earned: number; spent: number; net: number; redeemCount: number };
+  achievements: { unlocked: number; total: number };
+  advice: string;
+}
+
+export function getWeeklyReport() {
+  return http.get<any, ResultWrapper<WeeklyReport>>('/api/user/weekly-report');
+}

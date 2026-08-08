@@ -20,6 +20,7 @@ const router = createRouter({
     { path: '/bagu-practice', name: 'bagu-practice', component: () => import('../views/BaguPracticeView.vue'), meta: { title: '学习记录', requiresAuth: true } },
     { path: '/interview', name: 'interview', component: () => import('../views/InterviewView.vue'), meta: { title: '面试模拟', requiresAuth: true } },
     { path: '/shop', name: 'shop', component: () => import('../views/ShopView.vue'), meta: { title: '积分商城', requiresAuth: true } },
+    { path: '/weekly-report', name: 'weekly-report', component: () => import('../views/WeeklyReportView.vue'), meta: { title: '学习周报', requiresAuth: true } },
   ],
 });
 

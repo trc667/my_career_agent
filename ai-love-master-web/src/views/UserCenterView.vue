@@ -65,6 +65,16 @@
         <p class="uc-points__tip">每日签到 +5 分，连续 7 天额外 +10；点赞 AI 回复 +2 分；积分可在「积分商城」兑换资料与 VIP 体验卡</p>
       </div>
 
+      <!-- 学习周报入口（数据资产沉淀） -->
+      <router-link to="/weekly-report" class="uc-report">
+        <span class="uc-report__icon">📊</span>
+        <div class="uc-report__text">
+          <span class="uc-report__title">学习周报</span>
+          <span class="uc-report__desc">看看这周你聊了什么、学了多少、赚了多少积分</span>
+        </div>
+        <span class="uc-report__arrow">→</span>
+      </router-link>
+
       <!-- 成就徽章（留存游戏化） -->
       <div v-if="achievements.length" class="uc-achv">
         <h3 class="uc-achv__title">🏅 成就徽章</h3>
@@ -447,6 +457,56 @@ function handleLogout() {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.uc-report {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #eef4ff 0%, #f7f9ff 100%);
+  border: 1px solid #dbe6ff;
+  border-radius: var(--app-radius-md);
+  text-decoration: none;
+  color: var(--app-text);
+  transition: all 0.18s ease;
+}
+
+.theme-dark .uc-report {
+  background: linear-gradient(135deg, #1a2233 0%, #121826 100%);
+  border-color: #2a3550;
+}
+
+.uc-report:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--app-shadow-md);
+}
+
+.uc-report__icon {
+  font-size: 20px;
+}
+
+.uc-report__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.uc-report__title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.uc-report__desc {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+
+.uc-report__arrow {
+  color: var(--app-primary);
+  font-weight: 700;
 }
 
 .uc-points__left {
