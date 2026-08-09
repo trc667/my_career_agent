@@ -278,8 +278,8 @@ function runParticles(effect: WeatherEffect) {
   box-shadow: 0 14px 36px rgba(47, 107, 255, 0.22);
 }
 
-/* 天气主题渐变 */
-.wp--sunny { background: linear-gradient(135deg, #ffb74d 0%, #ff8f3d 100%); }
+/* 天气主题渐变（晴天用明亮天蓝，与站点商业蓝冷色调统一） */
+.wp--sunny { background: linear-gradient(135deg, #6fc2f7 0%, #3d9bf5 100%); }
 .wp--partly { background: linear-gradient(135deg, #5b8ff9 0%, #4a6cf7 100%); }
 .wp--cloudy { background: linear-gradient(135deg, #8fa3c2 0%, #6b7f9e 100%); }
 .wp--fog { background: linear-gradient(135deg, #b8c4d6 0%, #8fa0b8 100%); }
