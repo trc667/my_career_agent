@@ -142,10 +142,13 @@
           clearable
           @keyup.enter="doSearch"
         />
-        <el-button type="primary" size="large" class="home__search-btn pixel-btn" @click="doSearch">
+        <el-button type="primary" size="large" class="home__search-btn pixel-btn shimmer-btn" @click="doSearch">
           搜索
         </el-button>
       </div>
+
+      <!-- 热门主题滚动条（Marquee） -->
+      <MarqueeBar :items="marqueeItems" class="home__marquee" />
     </main>
 
     <!-- 数据面板区：左侧学习仪表盘 + 右侧动态天气 -->
@@ -398,6 +401,7 @@ import { ArrowDown } from '@element-plus/icons-vue';
 import PixelIcon from '../components/PixelIcon.vue';
 import DashboardPanel from '../components/DashboardPanel.vue';
 import WeatherPanel from '../components/WeatherPanel.vue';
+import MarqueeBar from '../components/MarqueeBar.vue';
 import { useAuthStore } from '../store/authStore';
 import { getLatestNotice, type Notice } from '../api/notice';
 import { getAchievements, getInvite, getPoints, getWeeklyReport, signIn, type WeeklyReport } from '../api/user';
@@ -405,6 +409,20 @@ import { useCountUp } from '../composables/useCountUp';
 
 const router = useRouter();
 const authStore = useAuthStore();
+
+/* ===== 热门主题滚动条（Marquee，点击跳对应功能） ===== */
+const marqueeItems = [
+  { icon: '🖥️', text: '后端开发', to: '/bagu' },
+  { icon: '🎨', text: '前端工程', to: '/bagu' },
+  { icon: '🧠', text: '算法刷题', to: '/bagu' },
+  { icon: '📄', text: '简历优化', to: '/resume-review' },
+  { icon: '🎯', text: '面试模拟', to: '/interview' },
+  { icon: '📚', text: '八股速刷', to: '/bagu' },
+  { icon: '🏫', text: '校招备战', to: '/career-master' },
+  { icon: '🛒', text: '积分商城', to: '/shop' },
+  { icon: '📊', text: '学习周报', to: '/weekly-report' },
+  { icon: '🏅', text: '成就徽章', to: '/user-center' },
+];
 
 /* ===== 首页积分/签到（登录后顶栏徽章 + 状态条快捷签到） ===== */
 const points = ref(0);
@@ -1125,6 +1143,12 @@ function dotStyle(n: number) {
 }
 
 /* ===== 应用卡片（3D 翻转） ===== */
+/* 热门主题滚动条 */
+.home__marquee {
+  max-width: 720px;
+  margin: 14px auto 0;
+}
+
 /* 数据面板区：左仪表盘 + 右天气 */
 .home__panels {
   position: relative;

@@ -36,6 +36,7 @@
           <el-button
             type="primary"
             round
+            class="shimmer-btn"
             :disabled="points < item.points || redeemingId === item.id"
             :loading="redeemingId === item.id"
             @click="handleRedeem(item)"

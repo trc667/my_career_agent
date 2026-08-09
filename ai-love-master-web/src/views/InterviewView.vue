@@ -28,7 +28,7 @@
         <el-button v-if="!quota.vip && quota.quotaLeft <= 0" type="primary" disabled size="large" round>
           今日次数已用完，开通 VIP 不限次
         </el-button>
-        <el-button v-else type="primary" size="large" round :loading="starting" @click="handleStart">
+        <el-button v-else type="primary" size="large" round :loading="starting" class="shimmer-btn" @click="handleStart">
           开始面试
         </el-button>
       </div>
@@ -52,7 +52,7 @@
           :disabled="reviewing"
         />
         <div class="iv-answer__actions">
-          <el-button type="primary" round :loading="reviewing" :disabled="!answerText.trim()" @click="handleAnswer">
+          <el-button type="primary" round :loading="reviewing" :disabled="!answerText.trim()" class="shimmer-btn" @click="handleAnswer">
             提交回答
           </el-button>
         </div>

@@ -231,3 +231,49 @@ body {
     transform: none;
   }
 }
+
+/* ===== 流光按钮（21st.dev Shimmer Button 风格，纯 CSS 零依赖） ===== */
+.shimmer-btn {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.shimmer-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -160%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(105deg, transparent 0%, rgba(255, 255, 255, 0.42) 50%, transparent 100%);
+  transform: skewX(-20deg);
+  animation: shimmer-sweep 2.8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.shimmer-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(47, 107, 255, 0.3);
+}
+
+.shimmer-btn:active {
+  transform: translateY(0);
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    left: -160%;
+  }
+  55%, 100% {
+    left: 160%;
+  }
+}
+
+/* 移动端：减少流光动画频率，避免耗电与视觉干扰 */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-btn::after {
+    animation: none;
+  }
+}
