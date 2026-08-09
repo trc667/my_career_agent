@@ -160,9 +160,22 @@ function cloudStyle(n: number) {
 function startFx() {
   cancelAnimationFrame(fxTimer);
   const effect = weather.value.effect as WeatherEffect;
-  if (!['rain', 'drizzle', 'snow', 'thunder'].includes(effect)) return;
+  if (!['rain', 'drizzle', 'snow', 'thunder'].includes(effect)) {
+    // 非粒子天气（晴/多云/雾）：清空画布，避免残留上一场雨滴画面
+    clearCanvas();
+    return;
+  }
   // 等待 DOM 布局完成后启动粒子，避免画布尺寸为 0 导致画面静止
   nextTick(() => runParticles(effect));
+}
+
+/** 清空天气画布（晴天/多云等非粒子天气调用） */
+function clearCanvas() {
+  const canvas = fxCanvas.value;
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
 function runParticles(effect: WeatherEffect) {
