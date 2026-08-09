@@ -54,17 +54,21 @@
       </div>
     </template>
 
-    <!-- 顶部装饰云（晴天/多云用） -->
-    <div class="wp__deco" aria-hidden="true">
-      <span class="wp__cloud wp__cloud--1"></span>
-      <span class="wp__cloud wp__cloud--2"></span>
-      <span class="wp__cloud wp__cloud--3"></span>
+    <!-- 顶部装饰云（晴天/多云用，多朵差异化滚动） -->
+    <div v-if="['sunny', 'partly', 'cloudy'].includes(weather.effect)" class="wp__deco" aria-hidden="true">
+      <span v-for="n in 5" :key="n" class="wp__cloud" :style="cloudStyle(n)"></span>
     </div>
+
+    <!-- 太阳动效（晴朗专属：中心光晕呼吸 + 光芒旋转） -->
+    <span v-if="weather.effect === 'sunny'" class="wp__sun" aria-hidden="true">
+      <span class="wp__sun-rays"></span>
+      <span class="wp__sun-core"></span>
+    </span>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { getWeather, type WeatherData, type WeatherEffect } from '../api/weather';
 
@@ -137,19 +141,46 @@ function locate() {
 }
 
 /* ===== Canvas 动态天气特效 ===== */
+/** 云朵差异化样式（尺寸/高度/速度/延迟各不相同） */
+function cloudStyle(n: number) {
+  const sizes = [90, 62, 120, 74, 104];
+  const tops = [22, 46, 60, 34, 52];
+  const durs = [16, 20, 24, 18, 22];
+  const size = sizes[n % sizes.length];
+  return {
+    width: size + 'px',
+    height: Math.round(size * 0.33) + 'px',
+    top: tops[n % tops.length] + '%',
+    left: -(size + 40) + 'px',
+    animationDuration: durs[n % durs.length] + 's',
+    animationDelay: n * 3.4 + 's',
+  };
+}
+
 function startFx() {
   cancelAnimationFrame(fxTimer);
-  const canvas = fxCanvas.value;
   const effect = weather.value.effect as WeatherEffect;
-  if (!canvas || !['rain', 'drizzle', 'snow', 'thunder'].includes(effect)) {
-    // 晴天/多云/雾用 CSS 云层与光晕，无需粒子
+  if (!['rain', 'drizzle', 'snow', 'thunder'].includes(effect)) return;
+  // 等待 DOM 布局完成后启动粒子，避免画布尺寸为 0 导致画面静止
+  nextTick(() => runParticles(effect));
+}
+
+function runParticles(effect: WeatherEffect) {
+  const canvas = fxCanvas.value;
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const W = rect.width;
+  const H = rect.height;
+  if (W < 2 || H < 2) {
+    // 尺寸未就绪：短暂重试
+    fxTimer = window.setTimeout(() => runParticles(effect), 150);
     return;
   }
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  const dpr = window.devicePixelRatio || 1;
-  const W = (canvas.width = canvas.clientWidth * dpr);
-  const H = (canvas.height = canvas.clientHeight * dpr);
   ctx.scale(dpr, dpr);
 
   const isSnow = effect === 'snow';
@@ -168,36 +199,48 @@ function startFx() {
   let flash = 0;
 
   const draw = () => {
-    ctx.clearRect(0, 0, W, H);
-    for (const d of drops) {
-      d.y += d.v;
-      if (isSnow) {
-        d.x += Math.sin(d.y / 30 + d.s) * 0.8;
-        if (d.y > H) { d.y = -5; d.x = Math.random() * W; }
-        ctx.beginPath();
-        ctx.arc(d.x, d.y, d.s, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
-        ctx.fill();
-      } else {
-        if (d.y > H) { d.y = -10; d.x = Math.random() * W; }
-        ctx.beginPath();
-        ctx.moveTo(d.x, d.y);
-        ctx.lineTo(d.x - 1.5, d.y + d.len);
-        ctx.strokeStyle = effect === 'drizzle' ? 'rgba(150,190,255,0.45)' : 'rgba(120,170,255,0.55)';
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
+    try {
+      ctx.clearRect(0, 0, W, H);
+      for (const d of drops) {
+        d.y += d.v;
+        if (isSnow) {
+          d.x += Math.sin(d.y / 30 + d.s) * 0.8;
+          if (d.y > H) {
+            d.y = -5;
+            d.x = Math.random() * W;
+          }
+          ctx.beginPath();
+          ctx.arc(d.x, d.y, d.s, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          ctx.fill();
+        } else {
+          if (d.y > H) {
+            d.y = -10;
+            d.x = Math.random() * W;
+          }
+          ctx.beginPath();
+          ctx.moveTo(d.x, d.y);
+          ctx.lineTo(d.x - 1.5, d.y + d.len);
+          ctx.strokeStyle = effect === 'drizzle' ? 'rgba(150,190,255,0.45)' : 'rgba(120,170,255,0.55)';
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+        }
       }
-    }
-    // 雷暴闪电闪烁
-    if (isThunder) {
-      flash -= 1;
-      if (flash <= 0 && Math.random() < 0.012) flash = 8;
-      if (flash > 0) {
-        ctx.fillStyle = `rgba(255,255,220,${flash / 8 * 0.35})`;
-        ctx.fillRect(0, 0, W, H);
+      // 雷暴闪电闪烁
+      if (isThunder) {
+        flash -= 1;
+        if (flash <= 0 && Math.random() < 0.012) flash = 8;
+        if (flash > 0) {
+          ctx.fillStyle = `rgba(255,255,220,${(flash / 8) * 0.35})`;
+          ctx.fillRect(0, 0, W, H);
+        }
       }
+      fxTimer = requestAnimationFrame(draw);
+    } catch (e) {
+      // 单帧异常不中断整个动画循环
+      console.warn('weather fx error:', e);
+      fxTimer = requestAnimationFrame(draw);
     }
-    fxTimer = requestAnimationFrame(draw);
   };
   draw();
 }
@@ -377,7 +420,7 @@ function startFx() {
   font-weight: 700;
 }
 
-/* 云层装饰（晴天/多云可见） */
+/* 云层装饰（晴天/多云可见，v-for 差异化滚动） */
 .wp__deco {
   position: absolute;
   inset: 0;
@@ -389,21 +432,60 @@ function startFx() {
   position: absolute;
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.35);
-  animation: wp-cloud 14s linear infinite;
-}
-
-.wp__cloud--1 { width: 90px; height: 30px; top: 24%; left: -100px; }
-.wp__cloud--2 { width: 60px; height: 22px; top: 46%; left: -80px; animation-delay: 5s; animation-duration: 18s; }
-.wp__cloud--3 { width: 120px; height: 34px; top: 62%; left: -130px; animation-delay: 9s; animation-duration: 22s; }
-
-.wp--sunny .wp__cloud,
-.wp--partly .wp__cloud,
-.wp--cloudy .wp__cloud {
-  animation: wp-cloud 16s linear infinite;
+  animation: wp-cloud linear infinite;
 }
 
 @keyframes wp-cloud {
-  from { transform: translateX(0); }
-  to { transform: translateX(calc(100vw + 260px)); }
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(100vw + 260px));
+  }
+}
+
+/* 太阳动效（晴朗专属） */
+.wp__sun {
+  position: absolute;
+  top: 10px;
+  right: 18px;
+  width: 72px;
+  height: 72px;
+  z-index: 1;
+  pointer-events: none;
+  animation: sun-breathe 3.2s ease-in-out infinite;
+}
+
+.wp__sun-rays {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(rgba(255, 222, 130, 0.9) 0deg 7deg, transparent 7deg 30deg);
+  animation: sun-spin 22s linear infinite;
+}
+
+.wp__sun-core {
+  position: absolute;
+  inset: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff8dc 0%, #ffd76a 55%, #ffb347 100%);
+  box-shadow: 0 0 26px 12px rgba(255, 200, 80, 0.5);
+}
+
+@keyframes sun-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sun-breathe {
+  0%, 100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.08);
+    filter: brightness(1.12);
+  }
 }
 </style>
