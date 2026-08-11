@@ -58,6 +58,7 @@
 19. **首页数据面板**：左侧学习仪表盘（积分渐变数字 + 签到 7 天 SVG 环形进度 + 连续签到/邀请/成就指标 + count-up 动效）+ 右侧动态天气面板（Open-Meteo 免费 API 后端代理，WMO 代码→动效，canvas 雨滴/雪花/闪电 + CSS 云层/雾，城市 chips 切换 + 浏览器定位）（`WeatherService`/`GET /api/weather`（公开）/`DashboardPanel`/`WeatherPanel`）
 20. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
 21. **模型切换 + 差异化计费**（Qoder 模式）：聊天页模型选择器（qwen-turbo/plus/max + deepseek-v3/r1，5 模型白名单），不同模型按**实际 token 消耗 × 模型费率（积分/千 token）**结算积分；调用前预检余额（≥1 分）、结束后按 usage 结算（usage 缺失按输出长度估算防白嫖）；VIP/ADMIN 免扣；FAQ/缓存命中不扣；非法模型名回落默认；`/api/models` 公开展示模型与费率；选择 localStorage 持久化（`ModelCatalog`/`PointService.precheckChat+settleChat`/`ChatInputBar` 模型下拉/`LoveMasterView`）
+22. **邀请海报（分享裂变补全）**：个人中心邀请卡片新增「保存海报」——canvas 绘制品牌海报（品牌蓝渐变 + 装饰圆环 + 标题/宣传语 + 白底圆角二维码卡片 + 邀请链接），弹窗展示支持下载 PNG（600x850 适配手机长按保存），配合既有专属链接/复制/二维码形成完整分享链路（`UserCenterView.drawPoster`/`openPoster`/`downloadPoster`）
 
 ## 四、本轮任务进度（已完成并验证）
 

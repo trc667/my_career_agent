@@ -114,10 +114,31 @@
           <img v-if="qrDataUrl" :src="qrDataUrl" alt="邀请二维码" class="uc-invite__qr" />
           <div class="uc-invite__right">
             <el-input :model-value="inviteLink" readonly size="small" class="uc-invite__link" />
-            <el-button type="primary" size="small" class="uc-invite__copy" @click="copyInviteLink">复制链接</el-button>
+            <div class="uc-invite__btns">
+              <el-button type="primary" size="small" @click="copyInviteLink">复制链接</el-button>
+              <el-button size="small" class="uc-invite__poster-btn" @click="openPoster">📸 保存海报</el-button>
+            </div>
           </div>
         </div>
       </div>
+
+      <!-- 邀请海报弹窗 -->
+      <el-dialog
+        v-model="posterVisible"
+        title="邀请海报"
+        width="min(92vw, 380px)"
+        append-to-body
+        class="uc-poster-dialog"
+      >
+        <div class="uc-poster">
+          <img v-if="posterDataUrl" :src="posterDataUrl" alt="邀请海报" class="uc-poster__img" />
+          <div class="uc-poster__actions">
+            <el-button type="primary" @click="downloadPoster">💾 下载海报</el-button>
+            <el-button @click="copyInviteLink">🔗 复制链接</el-button>
+          </div>
+          <p class="uc-poster__tip">长按图片可保存到相册，或下载后分享给好友</p>
+        </div>
+      </el-dialog>
 
       <el-divider />
 
@@ -253,6 +274,115 @@ async function copyInviteLink() {
   } catch {
     ElMessage.error('复制失败，请手动复制');
   }
+}
+
+/* 邀请海报：canvas 绘制品牌海报（背景渐变 + 文案 + 二维码 + 链接），支持下载/长按保存 */
+const posterVisible = ref(false);
+const posterDataUrl = ref('');
+
+/** 加载图片（二维码 dataURL → HTMLImageElement） */
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+/** 圆角矩形填充 */
+function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/** 绘制并返回海报 dataURL（600x850，适配手机长按保存） */
+async function drawPoster(): Promise<string> {
+  const W = 600;
+  const H = 850;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return qrDataUrl.value;
+
+  // 背景：品牌蓝渐变
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#2f6bff');
+  g.addColorStop(1, '#17c3f8');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // 装饰圆环（层次感）
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(W / 2, 250, 210, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.beginPath();
+  ctx.arc(W / 2, 250, 260, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 标题区
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 52px "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.fillText('职规大师', W / 2, 150);
+  ctx.font = '24px "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText('AI 职业规划 · 面试模拟 · 八股练习', W / 2, 195);
+
+  // 主文案
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 38px "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.fillText('🎁 邀请好友 双方得积分', W / 2, 320);
+  ctx.font = '24px "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.fillText(`好友注册并完成首次对话，你得 +${inviteInfo.rewardPoints || 50} 积分`, W / 2, 362);
+
+  // 二维码（白色圆角卡片承载）
+  const qr = await loadImage(qrDataUrl.value);
+  const qrSize = 300;
+  const qrX = (W - qrSize) / 2;
+  const qrY = 420;
+  ctx.fillStyle = '#ffffff';
+  roundRectPath(ctx, qrX - 22, qrY - 22, qrSize + 44, qrSize + 44, 26);
+  ctx.fill();
+  ctx.drawImage(qr, qrX, qrY, qrSize, qrSize);
+
+  // 底部提示 + 链接
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 22px "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.fillText('微信扫一扫 · 立即领取', W / 2, qrY + qrSize + 58);
+  ctx.fillStyle = 'rgba(255,255,255,0.78)';
+  ctx.font = '17px monospace';
+  const linkText = inviteLink.value.replace(/^https?:\/\//, '');
+  ctx.fillText(linkText.length > 44 ? linkText.slice(0, 44) + '…' : linkText, W / 2, qrY + qrSize + 92);
+
+  return canvas.toDataURL('image/png');
+}
+
+/** 打开海报弹窗 */
+async function openPoster() {
+  if (!qrDataUrl.value) {
+    ElMessage.warning('请稍候，二维码生成中…');
+    return;
+  }
+  posterDataUrl.value = await drawPoster();
+  posterVisible.value = true;
+}
+
+/** 下载海报 */
+function downloadPoster() {
+  const a = document.createElement('a');
+  a.href = posterDataUrl.value;
+  a.download = `职规大师邀请海报_${authStore.username || '好友'}.png`;
+  a.click();
 }
 
 const form = reactive({
@@ -720,16 +850,55 @@ function handleLogout() {
   flex: 1;
   min-width: 0;
   display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
 .uc-invite__link {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
 }
 
-.uc-invite__copy {
+.uc-invite__btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.uc-invite__poster-btn {
   flex-shrink: 0;
+}
+
+/* 邀请海报弹窗 */
+.uc-poster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.uc-poster__img {
+  width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(47, 107, 255, 0.25);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.uc-poster__actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.uc-poster__actions .el-button {
+  flex: 1;
+  border-radius: 9999px;
+}
+
+.uc-poster__tip {
+  margin: 0;
+  font-size: 12px;
+  color: var(--app-text-secondary);
 }
 
 .uc-form :deep(.el-input__wrapper) {
