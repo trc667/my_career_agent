@@ -102,6 +102,7 @@
 | 天气动效增强（太阳/云层/雨滴修复 + 晴天改天蓝） | ✅ |
 | 模型切换 + 差异化计费（deepseek 试点：白名单 + 按 token × 费率结算 + 预检/结算 + 前端选择器） | ✅ |
 | 启动跳过非空向量库 embedding（知识库重建 30-40s → 253ms，管理接口仍全量） | ✅ |
+| 登录/注册页 CodePen 风格改造（SVG blob 背景 + 白卡片 + 下划线输入框 + 渐变胶囊按钮，仿 afgprogrammer mYQQJV，配色换站点商业蓝） | ✅ |
 | Git 提交（安全审查通过，分模块 commit；push 已同步 GitHub） | ✅ |
 
 ## 五、量化成果（面试数据）
@@ -139,6 +140,7 @@
 - 运营看板：`service/AdminStatsService`（用户/今日活跃 DISTINCT 去重/积分账本/兑换/消耗去向 Top5）、`GET /api/admin/stats`、前端 `AdminView.vue`「运营看板」tab
 - 模型切换计费：`config/ModelCatalog`（5 模型白名单 + 费率 积分/千token + resolve 回落默认 + /api/models 公开）、`service/PointService.precheckChat`（余额≥1 预检）+`settleChat`（cost=max(1,ceil(tokens/1000)×费率)，余额不足扣到 0 保审计）、`CareerMasterServiceImpl`（chatWithRag/chatWithRagStream 接收 model + ChatOptions 运行时切模型 + settleChatQuietly 结算不中断主流程）、`ChatRequest.model`、前端 `ChatInputBar`（可选模型下拉+费率展示）、`LoveMasterView`（localStorage 记住选择）
 - 首页面板：`service/WeatherService`（Open-Meteo 代理 + 内置 10 城经纬度 + WMO→动效映射）、`GET /api/weather`（SecurityConfig 白名单公开）、前端 `components/DashboardPanel.vue`（SVG 环形 + count-up）+ `components/WeatherPanel.vue`（canvas 雨雪/闪电粒子 + CSS 云层）+ `HomePage`「home__panels」布局（1fr+320px，<900px 单列）
+- 登录/注册页：`components/AuthDecor.vue`（SVG 渐变 blob + 浮动代码符号）、`views/LoginView.vue`/`RegisterView.vue`（仿 afgprogrammer mYQQJV：浅紫蓝底 + 白卡片 20px 圆角 + 圆形渐变 logo + 无边框下划线输入框聚焦变主色 + 蓝青渐变胶囊按钮居中，全站商业蓝 #2f6bff→#17c3f8，含 theme-dark 适配）
 - 知识库：`resources/rag/career-tips.txt`（629 段种子源，仅首次导入用）；`entity/Knowledge` + `mapper/KnowledgeMapper` + `service/KnowledgeService`（DB 事实源，在线增删改查 + 异步全量重建 pgvector/BM25/八股缓存）；表 `knowledge`；启动优化：`RagDocumentLoader.isVectorStoreEmpty()` 判断向量库非空则跳过 embedding 复用持久化向量（`rebuildIndexesSync(skipVectorIfExists=true)`），管理接口 rebuildAsync 仍强制全量（知识变更必须重建）；向量库为空（首次/被清空）才全量向量化，启动重建 253ms（原 30-40s）
 - 知识库管理接口：`controller/AdminController`（/api/admin/knowledge*）+ 前端 `AdminView.vue`「知识库管理」tab + `api/admin.ts`
 - 配置：`application.yml`（公共）、`application-dev.yml`（敏感，不入库）、`application-raggen.yml`（批量生成）

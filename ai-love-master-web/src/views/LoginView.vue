@@ -64,12 +64,8 @@
       <span>AUTH MODULE · v1.0</span>
     </div>
 
-    <!-- 背景装饰 -->
-    <div class="auth-page__bg" aria-hidden="true">
-      <span class="app-orb app-orb--blue auth-orb auth-orb--1" />
-      <span class="app-orb app-orb--orange auth-orb auth-orb--2" />
-      <span class="app-orb app-orb--purple auth-orb auth-orb--3" />
-    </div>
+    <!-- 背景装饰（仿 afgprogrammer mYQQJV：SVG 渐变 blob + 代码符号） -->
+    <AuthDecor />
   </div>
 </template>
 
@@ -80,6 +76,7 @@ import { User, Lock } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { useAuthStore } from '../store/authStore';
 import { ElMessage } from 'element-plus';
+import AuthDecor from '../components/AuthDecor.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -118,6 +115,7 @@ async function handleLogin() {
 </script>
 
 <style scoped>
+/* ===== 仿 afgprogrammer mYQQJV 登录页：浅紫蓝底 + SVG blob + 白卡片 + 下划线输入框 + 渐变胶囊按钮 ===== */
 .auth-page {
   min-height: 100vh;
   display: flex;
@@ -127,12 +125,12 @@ async function handleLogin() {
   padding: var(--app-space-xl);
   position: relative;
   overflow: hidden;
-  background: linear-gradient(165deg, #f6f8fb 0%, #eef2f7 50%, #e6ebf2 100%);
+  background: linear-gradient(160deg, #e9edfa 0%, #dde3f7 55%, #d3daf3 100%);
   color: var(--app-text);
 }
 
 .theme-dark .auth-page {
-  background: linear-gradient(165deg, #14171c 0%, #101318 50%, #0d1014 100%);
+  background: linear-gradient(160deg, #14171c 0%, #101318 50%, #0d1014 100%);
 }
 
 .auth-page__bar {
@@ -156,102 +154,196 @@ async function handleLogin() {
   position: relative;
   z-index: 2;
   width: 100%;
-  max-width: 400px;
-  padding: 36px 32px;
-  background: var(--app-card);
-  border: 2px solid var(--app-border);
-  border-radius: var(--app-radius-md);
-  box-shadow: 0 4px 0 var(--app-border), 0 12px 40px rgba(0, 0, 0, 0.08);
+  max-width: 380px;
+  padding: 40px;
+  background: #fff;
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(47, 107, 255, 0.16);
   text-align: center;
   animation: app-fade-up 0.5s ease both;
 }
 
+.theme-dark .auth-card {
+  background: #1b2230;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
 .auth-card__logo {
-  width: 48px;
-  height: 48px;
-  margin: 0 auto var(--app-space-md);
-  border-radius: 4px;
-  background: linear-gradient(135deg, #409eff, #5db2ff);
+  width: 70px;
+  height: 70px;
+  margin: 0 auto 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2f6bff, #17c3f8);
   color: #fff;
-  font-weight: 800;
-  font-size: 16px;
+  font-weight: 600;
+  font-size: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 3px 3px 0 rgba(64, 158, 255, 0.55);
+  box-shadow: 0 10px 24px rgba(47, 107, 255, 0.38);
 }
 
 .auth-title {
   margin: 0 0 6px;
-  font-size: 24px;
-  font-weight: 800;
-  color: var(--app-text);
+  font-size: 30px;
+  font-weight: 500;
+  color: #2f6bff;
+}
+
+.theme-dark .auth-title {
+  color: #6ea8ff;
 }
 
 .auth-desc {
-  margin: 0 0 var(--app-space-xl);
-  font-size: 13px;
-  color: var(--app-text-secondary);
+  margin: 0 0 32px;
+  font-size: 15px;
+  font-weight: 300;
+  color: #2f6bff;
+  opacity: 0.68;
+}
+
+.theme-dark .auth-desc {
+  color: #8fa8d8;
 }
 
 .auth-form {
   text-align: left;
 }
 
+.auth-form :deep(.el-form-item) {
+  margin-bottom: 8px;
+}
+
+.auth-form :deep(.el-form-item__label) {
+  color: #555;
+  font-weight: 400;
+  font-size: 14px;
+}
+
+.theme-dark .auth-form :deep(.el-form-item__label) {
+  color: #c6cede;
+}
+
+/* 下划线输入框：无边框，仅底部细线，聚焦变主色 */
 .auth-form :deep(.el-input__wrapper) {
-  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  border-bottom: 2px solid rgba(153, 153, 153, 0.35);
+  padding: 0 2px;
+  transition: border-color 0.25s ease;
+}
+
+.auth-form :deep(.el-input__wrapper.is-focus) {
+  border-bottom-color: #2f6bff;
+}
+
+.auth-form :deep(.el-input__inner) {
+  height: 50px;
+  font-size: 17px;
+  color: #333;
+}
+
+.auth-form :deep(.el-input__inner::placeholder) {
+  color: #999;
+  font-size: 17px;
+  font-weight: 300;
+}
+
+.auth-form :deep(.el-input__prefix) {
+  color: #999;
+}
+
+.auth-form :deep(.el-input__wrapper.is-focus .el-input__prefix) {
+  color: #2f6bff;
+}
+
+.theme-dark .auth-form :deep(.el-input__wrapper) {
+  border-bottom-color: rgba(255, 255, 255, 0.22);
+}
+
+.theme-dark .auth-form :deep(.el-input__inner) {
+  color: #e8ecf4;
+}
+
+.theme-dark .auth-form :deep(.el-input__inner::placeholder) {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.theme-dark .auth-form :deep(.el-input__prefix) {
+  color: #8fa8d8;
+}
+
+/* 渐变胶囊按钮（居中，非通栏） */
+.auth-form :deep(.el-form-item__content) {
+  justify-content: center;
+  padding-top: 14px;
 }
 
 .auth-submit {
-  width: 100%;
-  border-radius: 3px;
-  font-weight: 600;
-  background: #409eff;
+  width: 120px;
+  height: 42px;
+  margin: 0 auto;
+  border-radius: 50px;
+  font-weight: 400;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  background: linear-gradient(to right, #2f6bff, #17c3f8);
   border: none;
-  box-shadow: 0 4px 0 #2f7fd6;
-  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.2s ease;
+  box-shadow: 0 8px 20px rgba(47, 107, 255, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.2s ease;
 }
 
 .auth-submit:hover {
-  box-shadow: 0 6px 0 #2f7fd6;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(47, 107, 255, 0.42);
   filter: brightness(1.05);
 }
 
 .auth-submit:active {
-  box-shadow: 0 0 0 #2f7fd6;
-  transform: translateY(4px);
+  transform: translateY(1px);
+  box-shadow: 0 4px 12px rgba(47, 107, 255, 0.28);
 }
 
 .auth-switch {
-  margin: var(--app-space-lg) 0 0;
+  margin: 26px 0 0;
   font-size: 14px;
-  color: var(--app-text-secondary);
+  color: #777;
   text-align: center;
 }
 
+.theme-dark .auth-switch {
+  color: #9aa8bf;
+}
+
 .auth-switch__link {
-  color: var(--app-accent-blue);
+  color: #2f6bff;
   text-decoration: none;
   margin-left: 4px;
 }
 
+.theme-dark .auth-switch__link {
+  color: #6ea8ff;
+}
+
 .auth-agreement {
-  margin: var(--app-space-sm) 0 0;
+  margin: 10px 0 0;
   font-size: 12px;
-  color: var(--app-text-secondary);
+  color: #999;
   text-align: center;
 }
 
 .auth-agreement__link {
-  color: var(--app-accent-blue);
+  color: #2f6bff;
   text-decoration: none;
 }
 
-.auth-agreement__link:hover {
-  text-decoration: underline;
+.theme-dark .auth-agreement__link {
+  color: #6ea8ff;
 }
 
+.auth-agreement__link:hover,
 .auth-switch__link:hover {
   text-decoration: underline;
 }
@@ -265,8 +357,12 @@ async function handleLogin() {
   gap: 8px;
   font-size: 11px;
   letter-spacing: 0.15em;
-  color: var(--app-text-secondary);
+  color: #7b87a8;
   font-family: 'JetBrains Mono', 'Consolas', monospace;
+}
+
+.theme-dark .auth-page__status {
+  color: #6b7690;
 }
 
 .auth-page__status-dot {
@@ -277,45 +373,13 @@ async function handleLogin() {
   animation: app-pulse 1.5s ease-in-out infinite;
 }
 
-/* 背景装饰 */
-.auth-page__bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.auth-orb--1 {
-  width: 360px;
-  height: 360px;
-  top: -100px;
-  right: -80px;
-}
-
-.auth-orb--2 {
-  width: 300px;
-  height: 300px;
-  bottom: -60px;
-  left: -80px;
-  animation-delay: 2s;
-}
-
-.auth-orb--3 {
-  width: 200px;
-  height: 200px;
-  top: 30%;
-  left: 12%;
-  animation-delay: 4s;
-  opacity: 0.8;
-}
-
 @media (max-width: 767px) {
   .auth-page {
     padding: var(--app-space-md);
   }
 
   .auth-card {
-    padding: 28px 22px;
+    padding: 30px 24px;
   }
 }
 </style>
