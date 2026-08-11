@@ -64,7 +64,9 @@ public class KnowledgeService {
         this.baguService = baguService;
     }
 
-    /** 启动初始化：表空则从 career-tips.txt 导入，再全量重建索引（RagInitRunner 调用，同步） */
+    /** 启动初始化：表空则从 career-tips.txt 导入，再重建索引（RagInitRunner 调用，同步）。
+     * 向量库持久化在 pgvector：非空则跳过 embedding 复用旧向量（启动从 30-40s 降到秒级、省 API 费），
+     * 为空（首次/被清空）才全量向量化；知识变更仍由管理接口触发全量重建保证一致性。 */
     public void ensureInitialized() {
         long count = knowledgeMapper.selectCount(null);
         if (count == 0) {
@@ -72,7 +74,7 @@ public class KnowledgeService {
         } else {
             log.info("知识库已存在 {} 条，跳过文件导入", count);
         }
-        rebuildIndexesSync();
+        rebuildIndexesSync(true);
     }
 
     /** 从 career-tips.txt 一次性导入 DB（仅首次，之后以 DB 为唯一事实源） */
@@ -183,20 +185,22 @@ public class KnowledgeService {
         rebuildAsync();
     }
 
-    /** 触发异步全量重建（管理接口调用，立即返回） */
+    /** 触发异步全量重建（管理接口调用，立即返回；知识变更必须全量重建保证三处索引一致） */
     public void rebuildAsync() {
         if (rebuilding.compareAndSet(false, true)) {
             rebuildStatus = "running";
             rebuildInfo = "重建中，耗时约 1-2 分钟...";
-            CompletableFuture.runAsync(this::rebuildIndexesSync, rebuildExecutor);
+            CompletableFuture.runAsync(() -> rebuildIndexesSync(false), rebuildExecutor);
         } else {
             log.info("知识库重建已在进行中，忽略本次触发");
         }
     }
 
-    /** 同步全量重建三处检索源（启动 / 异步任务共用，需先通过 rebuilding 防重入） */
-    private void rebuildIndexesSync() {
+    /** 同步重建三处检索源（启动 / 异步任务共用，需先通过 rebuilding 防重入）。
+     * @param skipVectorIfExists 启动场景传 true：向量库非空则跳过 embedding（持久化复用）；管理接口传 false 强制全量。 */
+    private void rebuildIndexesSync(boolean skipVectorIfExists) {
         long start = System.currentTimeMillis();
+        boolean vectorSkipped = false;
         try {
             List<Knowledge> enabledList = knowledgeMapper.selectList(
                     new LambdaQueryWrapper<Knowledge>()
@@ -212,16 +216,24 @@ public class KnowledgeService {
                 log.warn("知识库重建跳过：无启用知识段");
                 return;
             }
-            // 1) 向量库（pgvector，embedding 逐批入库，最耗时）
-            ragDocumentLoader.reloadFromParagraphs(paragraphs);
+            // 1) 向量库（pgvector，embedding 逐批入库，最耗时）：启动时非空则复用持久化向量
+            if (skipVectorIfExists && !ragDocumentLoader.isVectorStoreEmpty()) {
+                vectorSkipped = true;
+                log.info("向量库非空，跳过 embedding（启动复用持久化向量）");
+            } else {
+                ragDocumentLoader.reloadFromParagraphs(paragraphs);
+            }
             // 2) BM25 稀疏索引（Lucene 内存索引，毫秒级）
             hybridRetriever.rebuildBm25(paragraphs);
             // 3) 八股练习场内存缓存
             baguService.reload(paragraphs);
             rebuildStatus = "success";
-            rebuildInfo = String.format("重建成功：%d 段，耗时 %.1fs", paragraphs.size(),
-                    (System.currentTimeMillis() - start) / 1000.0);
-            log.info("知识库全量重建完成：{} 段，耗时 {}ms", paragraphs.size(), System.currentTimeMillis() - start);
+            rebuildInfo = String.format("重建成功：%d 段，耗时 %.1fs%s", paragraphs.size(),
+                    (System.currentTimeMillis() - start) / 1000.0,
+                    vectorSkipped ? "（向量库已存在跳过 embedding）" : "");
+            log.info("知识库全量重建完成：{} 段，耗时 {}ms{}", paragraphs.size(),
+                    System.currentTimeMillis() - start,
+                    vectorSkipped ? "（向量库已存在跳过 embedding）" : "");
         } catch (Exception e) {
             rebuildStatus = "failed";
             rebuildInfo = "重建失败：" + e.getMessage();

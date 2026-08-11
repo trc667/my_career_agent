@@ -68,6 +68,18 @@ public class RagDocumentLoader {
         return paragraphs;
     }
 
+    /** 向量库是否为空（启动时判断是否需要重新 embedding：非空则复用持久化向量） */
+    public boolean isVectorStoreEmpty() {
+        try {
+            Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM vector_store", Integer.class);
+            return count == null || count == 0;
+        } catch (Exception e) {
+            // 查询失败按非空处理，避免意外触发全量重建
+            log.warn("向量库计数失败，按非空处理：{}", e.getMessage());
+            return false;
+        }
+    }
+
     /**
      * 从知识段列表重建向量索引（管理后台增删改后调用）：先 TRUNCATE 旧向量，再全量入库。
      * 入库前清空旧数据防止新旧混杂/重复堆积/topK 被重复内容挤占；TRUNCATE 比 DELETE 快且重置序列。
