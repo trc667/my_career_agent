@@ -3,7 +3,7 @@
     <!-- 顶部导航 -->
     <header class="home__nav">
       <div class="home__brand">
-        <span class="home__brand-logo pixel-font">AI</span>
+        <img src="/logo.jpg" alt="职规助手" class="home__brand-logo" />
         <span class="home__brand-name">职规助手</span>
         <small class="home__brand-sub pixel-font">career-master</small>
       </div>
@@ -880,13 +880,8 @@ function dotStyle(n: number) {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #4a8bff, #2f6bff);
-  color: #fff;
-  font-weight: 800;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  object-fit: cover;
+  display: block;
   box-shadow: 0 4px 14px rgba(47, 107, 255, 0.32);
 }
 

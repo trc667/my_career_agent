@@ -5,7 +5,7 @@
     </div>
 
     <div class="auth-card">
-      <div class="auth-card__logo">AI</div>
+      <img src="/logo.jpg" alt="职规大师 Logo" class="auth-card__logo" />
       <h1 class="auth-title">注册</h1>
       <p class="auth-desc">注册账号后登录使用 AI 功能</p>
       <el-form
@@ -294,17 +294,12 @@ async function handleRegister() {
 }
 
 .auth-card__logo {
-  width: 70px;
-  height: 70px;
+  width: 76px;
+  height: 76px;
   margin: 0 auto 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #2f6bff, #17c3f8);
-  color: #fff;
-  font-weight: 600;
-  font-size: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  object-fit: cover;
+  display: block;
   box-shadow: 0 10px 24px rgba(47, 107, 255, 0.38);
 }
 
