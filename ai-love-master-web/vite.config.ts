@@ -6,6 +6,10 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     port: 5175,
+    // 允许外部访问（cpolar 隧道转发需要）：监听所有网卡 + 放行 cpolar 域名 Host
+    // 否则 Vite 默认拒绝非 localhost 的 Host 请求，经隧道访问页面会返回 403
+    host: true,
+    allowedHosts: ['.cpolar.top', '.cpolar.cn', '.cpolar.com', '.vip.cpolar.cn'],
     // 本地开发代理：/api 转发到后端（生产由 Netlify _redirects 代理）
     proxy: {
       '/api': {
