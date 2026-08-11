@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.example.aimaster.config.ModelCatalog;
 import com.example.aimaster.entity.InviteReward;
 import com.example.aimaster.entity.PointLog;
 import com.example.aimaster.entity.SignIn;
@@ -48,13 +49,15 @@ public class PointService {
     private final PointLogMapper pointLogMapper;
     private final SignInMapper signInMapper;
     private final InviteRewardMapper inviteRewardMapper;
+    private final ModelCatalog modelCatalog;
 
     public PointService(UserMapper userMapper, PointLogMapper pointLogMapper, SignInMapper signInMapper,
-                        InviteRewardMapper inviteRewardMapper) {
+                        InviteRewardMapper inviteRewardMapper, ModelCatalog modelCatalog) {
         this.userMapper = userMapper;
         this.pointLogMapper = pointLogMapper;
         this.signInMapper = signInMapper;
         this.inviteRewardMapper = inviteRewardMapper;
+        this.modelCatalog = modelCatalog;
     }
 
     /** 用户积分画像（含今日签到状态与连续天数） */
@@ -160,6 +163,11 @@ public class PointService {
      * 防并发超扣；余额不足抛 BusinessException 由调用方提示。
      */
     public void consumeForChat(String username, int cost) {
+        consumeForChat(username, cost, "AI 对话消耗");
+    }
+
+    /** 对话消耗积分（可自定义流水原因，如按模型计费时写 "AI 对话消耗:deepseek-v3"） */
+    public void consumeForChat(String username, int cost, String reason) {
         if (username == null || username.isBlank() || cost <= 0) return;
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username.trim()));
         if (user == null) return;
@@ -175,9 +183,62 @@ public class PointService {
             throw new BusinessException("积分不足：本次对话需要 " + cost + " 积分，请先到个人中心签到获取");
         }
         pointLogMapper.insert(PointLog.builder()
-                .userId(user.getId()).changePoints(-cost).reason("AI 对话消耗")
+                .userId(user.getId()).changePoints(-cost)
+                .reason(reason != null && !reason.isBlank() ? reason : "AI 对话消耗")
                 .createTime(LocalDateTime.now()).build());
-        log.info("对话消耗积分: username={} cost={}", username, cost);
+        log.info("对话消耗积分: username={} cost={} reason={}", username, cost, reason);
+    }
+
+    /**
+     * 对话前预检（按 token 计费模式下，调用前只拦截“连最低消费都不够”的用户）：
+     * 余额 ≥ 1 分放行（每次对话至少 1 分），VIP/ADMIN 不检。
+     */
+    public void precheckChat(String username, String model) {
+        if (username == null || username.isBlank()) return;
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username.trim()));
+        if (user == null) return;
+        if ("ADMIN".equals(user.getRole()) || "VIP".equals(user.getLevel())) return;
+        int points = user.getPoints() == null ? 0 : user.getPoints();
+        if (points < 1) {
+            throw new BusinessException("积分不足：" + modelCatalog.nameOf(model) + " 对话至少消耗 1 积分，请先到个人中心签到获取");
+        }
+    }
+
+    /**
+     * 对话结束按实际 token 结算（模型切换计费核心）：
+     * cost = max(1, ceil(totalTokens/1000) * 模型费率)；
+     * 余额不足时按剩余扣到 0（对话已完成不拦用户，但流水审计完整、不会为负）。
+     */
+    public void settleChat(String username, String model, int totalTokens) {
+        if (username == null || username.isBlank()) return;
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username.trim()));
+        if (user == null) return;
+        if ("ADMIN".equals(user.getRole()) || "VIP".equals(user.getLevel())) return;
+        int rate = modelCatalog.rateOf(model);
+        int cost = Math.max(1, (int) Math.ceil((Math.max(totalTokens, 0) / 1000.0)) * rate);
+        String reason = "AI 对话消耗:" + modelCatalog.resolve(model);
+        int rows = userMapper.update(null, new UpdateWrapper<User>()
+                .setSql("points = points - " + cost)
+                .eq("id", user.getId())
+                .ge("points", cost));
+        if (rows == 0) {
+            // 余额不足：按剩余积分扣到 0，保证审计完整
+            int actual = Math.min(cost, Math.max(0, user.getPoints() == null ? 0 : user.getPoints()));
+            if (actual > 0) {
+                userMapper.update(null, new UpdateWrapper<User>()
+                        .setSql("points = points - " + actual)
+                        .eq("id", user.getId()));
+                cost = actual;
+            } else {
+                cost = 0;
+            }
+        }
+        if (cost > 0) {
+            pointLogMapper.insert(PointLog.builder()
+                    .userId(user.getId()).changePoints(-cost).reason(reason)
+                    .createTime(LocalDateTime.now()).build());
+        }
+        log.info("模型对话结算: username={} model={} tokens={} cost={}", username, model, totalTokens, cost);
     }
 
     /**

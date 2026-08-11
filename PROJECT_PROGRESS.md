@@ -57,6 +57,7 @@
 18. **运营看板**（管理后台 tab）：用户规模（总数/本周新增/VIP）、今日活跃（对话∪签到去重）、对话/签到/八股打卡、本周积分发放消耗、商城兑换统计、积分消耗去向 Top5、**面试模拟使用量（VIP 卖点）**、**转化漏斗（注册→首聊→首签→兑换→VIP 相对转化率）**（`AdminStatsService`/`GET /api/admin/stats`/`AdminView`「运营看板」tab）
 19. **首页数据面板**：左侧学习仪表盘（积分渐变数字 + 签到 7 天 SVG 环形进度 + 连续签到/邀请/成就指标 + count-up 动效）+ 右侧动态天气面板（Open-Meteo 免费 API 后端代理，WMO 代码→动效，canvas 雨滴/雪花/闪电 + CSS 云层/雾，城市 chips 切换 + 浏览器定位）（`WeatherService`/`GET /api/weather`（公开）/`DashboardPanel`/`WeatherPanel`）
 20. 其他：登录注册(JWT)、个人中心、管理后台(公告/反馈/用户/AI设置/错误日志)、意见反馈、限流
+21. **模型切换 + 差异化计费**（Qoder 模式）：聊天页模型选择器（qwen-turbo/plus/max + deepseek-v3/r1，5 模型白名单），不同模型按**实际 token 消耗 × 模型费率（积分/千 token）**结算积分；调用前预检余额（≥1 分）、结束后按 usage 结算（usage 缺失按输出长度估算防白嫖）；VIP/ADMIN 免扣；FAQ/缓存命中不扣；非法模型名回落默认；`/api/models` 公开展示模型与费率；选择 localStorage 持久化（`ModelCatalog`/`PointService.precheckChat+settleChat`/`ChatInputBar` 模型下拉/`LoveMasterView`）
 
 ## 四、本轮任务进度（已完成并验证）
 
@@ -98,6 +99,8 @@
 | 运营看板转化漏斗（注册→首聊→首签→兑换→VIP） | ✅ |
 | 骨架屏打磨（天气/面试记录/周报/商城加载占位） | ✅ |
 | 首页充实（本周概览 + 快捷入口扩充 + 协议去重） | ✅ |
+| 天气动效增强（太阳/云层/雨滴修复 + 晴天改天蓝） | ✅ |
+| 模型切换 + 差异化计费（deepseek 试点：白名单 + 按 token × 费率结算 + 预检/结算 + 前端选择器） | ✅ |
 | Git 提交（安全审查通过，分模块 commit；push 已同步 GitHub） | ✅ |
 
 ## 五、量化成果（面试数据）
@@ -133,6 +136,7 @@
 - 积分商城：`service/ShopService`（原子扣分 UPDATE...WHERE points>=cost 防超扣 + point_log/redeem_record 双写 + VIP_CARD 调 grantVip）、`controller/ShopController`（/api/shop/items|redeem|records）、`entity/RedeemItem`+`RedeemRecord`、表 `redeem_item`/`redeem_record`（schema.sql 内置 4 个初始商品）、前端 `views/ShopView.vue`+`api/shop.ts`+路由 /shop+个人中心入口
 - 周报：`service/WeeklyReportService`（本周一 00:00 起聚合 conversation/sign_in/bagu_*/point_log/redeem_record/resume_review + 规则建议）、`GET /api/user/weekly-report`、前端 `views/WeeklyReportView.vue`+路由 /weekly-report+个人中心入口条
 - 运营看板：`service/AdminStatsService`（用户/今日活跃 DISTINCT 去重/积分账本/兑换/消耗去向 Top5）、`GET /api/admin/stats`、前端 `AdminView.vue`「运营看板」tab
+- 模型切换计费：`config/ModelCatalog`（5 模型白名单 + 费率 积分/千token + resolve 回落默认 + /api/models 公开）、`service/PointService.precheckChat`（余额≥1 预检）+`settleChat`（cost=max(1,ceil(tokens/1000)×费率)，余额不足扣到 0 保审计）、`CareerMasterServiceImpl`（chatWithRag/chatWithRagStream 接收 model + ChatOptions 运行时切模型 + settleChatQuietly 结算不中断主流程）、`ChatRequest.model`、前端 `ChatInputBar`（可选模型下拉+费率展示）、`LoveMasterView`（localStorage 记住选择）
 - 首页面板：`service/WeatherService`（Open-Meteo 代理 + 内置 10 城经纬度 + WMO→动效映射）、`GET /api/weather`（SecurityConfig 白名单公开）、前端 `components/DashboardPanel.vue`（SVG 环形 + count-up）+ `components/WeatherPanel.vue`（canvas 雨雪/闪电粒子 + CSS 云层）+ `HomePage`「home__panels」布局（1fr+320px，<900px 单列）
 - 知识库：`resources/rag/career-tips.txt`（629 段种子源，仅首次导入用）；`entity/Knowledge` + `mapper/KnowledgeMapper` + `service/KnowledgeService`（DB 事实源，在线增删改查 + 异步全量重建 pgvector/BM25/八股缓存）；表 `knowledge`
 - 知识库管理接口：`controller/AdminController`（/api/admin/knowledge*）+ 前端 `AdminView.vue`「知识库管理」tab + `api/admin.ts`
@@ -179,6 +183,7 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - [x] 商业化：积分商城（兑换出口：简历模板/时间线/高频题 TOP50/7 天 VIP 卡，原子扣分 + 双表审计）
 - [x] 商业化：运营看板（管理后台用户活跃/留存/积分消耗统计 + 消耗去向 Top）
 - [x] 商业化：用户学习周报（断点②：每周汇总对话主题/错题进步/连续签到/成就解锁，数据资产沉淀）
+- [x] 商业化：模型切换 + 差异化计费（deepseek 试点：白名单 + 按 token × 积分费率结算，参考 Qoder）
 
 ### P3 暂缓/锦上添花
 - [ ] 商业化：小程序/移动端（等真实用户数据）
@@ -189,6 +194,7 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - [ ] 商业化：简历深度报告（VIP 专属，现有 6 维评分升级为逐段点评 + 改写对比）
 - [ ] 商业化：知识点掌握度地图（八股按主题雷达图可视化）
 - [ ] 商业化：支付接入（个人项目先 admin 手动开 VIP，等真实用户再上微信/支付宝）
+- [ ] 商业化：模型费率运营化（ModelCatalog 静态配置 → DB 表可后台调价）+ 扩充百炼第三方模型（glm 需单独接智谱 Key）
 
 ## 九、踩坑备忘（本会话）
 
@@ -213,3 +219,4 @@ cd ai-love-master-web; npm run dev   # 5175，对接 8080
 - PowerShell 5.1 无 BOM 的 UTF-8 脚本按 GBK 误读 → 中文参数（如岗位名）静默变乱码不报错；脚本内 JSON body 中文一律用 \uXXXX 转义；业务失败可能封装在 HTTP 200 + {code:400}（Result.fail），测试脚本必须检查响应 code 而非仅看 HTTP 状态码
 - 沙箱 Stop-Process 会静默失败：重启后端必须复核 8080 归属（Get-CimInstance + 直接 PID 停止），否则新代码不生效且旧进程继续占用（曾致新接口 404 与 "Port 8080 was already in use"）；Get-NetTCPConnection 在该环境不可靠可能返回空，以 netstat/Get-CimInstance 为准
 - 成就验证：数据实时判定（对话次数按 point_log「AI 对话消耗」计数、累计积分按正数流水求和），规则改代码即生效不落表
+- 模型计费验证：testuser01 曾兑换 7 天 VIP → 聊天不扣分属预期（VIP 免扣），验证 FREE 扣分需用 FREE 账号（klu/123456，0 分可直接验预检拦截）；`mvn spring-boot:run` 若报 RunMojo class version 61.0 需先设 `$env:JAVA_HOME=C:\Users\tan\.jdks\ms-17.0.16`（当前终端默认 Java 11）；沙箱环境 mysql.exe 写操作 Access denied，SELECT 可读，改测试账号状态优先走 admin API（/api/admin/points|vip）而非直连 DB

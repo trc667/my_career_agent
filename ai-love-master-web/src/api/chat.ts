@@ -10,6 +10,17 @@ export interface ChatRequestDto {
   message: string;
   conversationId?: string;
   stream?: boolean;
+  /** 可选模型名（如 deepseek-v3 / qwen-max），空则后端用默认 qwen-plus */
+  model?: string;
+}
+
+/** 可选模型条目（模型切换 + 费率展示） */
+export interface ChatModelOption {
+  id: string;
+  name: string;
+  rate: number;
+  desc: string;
+  default?: boolean;
 }
 
 export interface AssistantStepDto {
@@ -35,6 +46,10 @@ export function postChatReact(body: ChatRequestDto, maxSteps = 8) {
     `/api/chat/react?maxSteps=${maxSteps}`,
     body,
   );
+}
+
+export function getChatModels() {
+  return http.get<any, ResultWrapper<ChatModelOption[]>>('/api/models');
 }
 
 export function getHealth() {

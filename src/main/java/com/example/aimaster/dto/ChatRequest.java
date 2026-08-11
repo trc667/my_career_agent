@@ -26,4 +26,10 @@ public class ChatRequest {
      * 多轮对话的会话 ID。不传则视为新会话或单轮；传则在该会话历史基础上继续对话。
      */
     private String conversationId;
+
+    /**
+     * 可选模型名（如 deepseek-v3 / qwen-max）。空则服务端用默认模型 qwen-plus；
+     * 不同模型按实际 token 消耗不同积分（费率见 /api/models）。
+     */
+    private String model;
 }

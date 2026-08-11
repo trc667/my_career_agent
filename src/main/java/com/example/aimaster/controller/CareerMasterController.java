@@ -1,5 +1,6 @@
 package com.example.aimaster.controller;
 
+import com.example.aimaster.config.ModelCatalog;
 import com.example.aimaster.dto.ChatRequest;
 import com.example.aimaster.dto.ChatResponse;
 import com.example.aimaster.dto.ChatStreamSession;
@@ -32,6 +33,8 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -58,33 +61,42 @@ public class CareerMasterController {
     private final SensitiveWordFilter sensitiveWordFilter;
     private final ConversationMapper conversationMapper;
     private final AuthService authService;
+    private final ModelCatalog modelCatalog;
 
     public CareerMasterController(CareerMasterService careerMasterService,
                                 ConversationMemoryStore memoryStore,
                                 @Autowired(required = false) SensitiveWordFilter sensitiveWordFilter,
                                 ConversationMapper conversationMapper,
-                                AuthService authService) {
+                                AuthService authService,
+                                ModelCatalog modelCatalog) {
         this.careerMasterService = careerMasterService;
         this.memoryStore = memoryStore;
         this.sensitiveWordFilter = sensitiveWordFilter;
         this.conversationMapper = conversationMapper;
         this.authService = authService;
+        this.modelCatalog = modelCatalog;
+    }
+
+    @GetMapping(value = "/models", produces = "application/json; charset=UTF-8")
+    public Result<List<Map<String, Object>>> models() {
+        return Result.ok(modelCatalog.list());
     }
 
 @RateLimiter(name = "chatLimiter")
     @PostMapping(value = "/chat", produces = "application/json; charset=UTF-8")
     public Result<ChatResponse> chat(@Valid @RequestBody ChatRequest request) {
-        ChatResponse response = careerMasterService.chatWithRag(request.getConversationId(), request.getMessage());
+        ChatResponse response = careerMasterService.chatWithRag(request.getConversationId(), request.getMessage(), request.getModel());
         return Result.ok(response);
     }
 @RateLimiter(name="chatLimiter")
     @GetMapping(value = "/chat", produces = "application/json; charset=UTF-8")
     public Result<ChatResponse> chatGet(@RequestParam(required = false) String message,
-                                        @RequestParam(required = false) String conversationId) {
+                                        @RequestParam(required = false) String conversationId,
+                                        @RequestParam(required = false) String model) {
         if (message == null || message.isBlank()) {
             return Result.fail(400, "请加上参数: message=你的问题");
         }
-        ChatResponse response = careerMasterService.chatWithRag(conversationId, message.trim());
+        ChatResponse response = careerMasterService.chatWithRag(conversationId, message.trim(), model);
         return Result.ok(response);
     }
     @RateLimiter(name="chatLimiter")
@@ -93,7 +105,7 @@ public class CareerMasterController {
         SseEmitter emitter = new SseEmitter(180_000L);
         String userMessage = request.getMessage();
         String conversationId = request.getConversationId();
-        ChatStreamSession streamSession = careerMasterService.chatWithRagStream(conversationId, userMessage);
+        ChatStreamSession streamSession = careerMasterService.chatWithRagStream(conversationId, userMessage, request.getModel());
         StringBuilder fullReply = new StringBuilder();
         SecurityContext ctx = SecurityContextHolder.getContext();
 

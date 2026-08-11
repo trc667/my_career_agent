@@ -48,6 +48,8 @@
         <ChatInputBar
           :disabled="loading || typing"
           :typing="typing"
+          :models="chatModels"
+          v-model="selectedModel"
           @send="handleSend"
           @clear="handleClear"
           @stop="stopGenerating"
@@ -83,7 +85,8 @@ import SkillGapDialog from '../components/mcp/SkillGapDialog.vue';
 import ExamPlanDialog from '../components/mcp/ExamPlanDialog.vue';
 
 import { postChatStream } from '../api/chatStream';
-import { postChatFeedback } from '../api/chat';
+import { postChatFeedback, getChatModels } from '../api/chat';
+import type { ChatModelOption } from '../api/chat';
 import { useStreamTypewriter } from '../composables/useStreamTypewriter';
 import { useLoveMasterStore } from '../store/loveMasterStore';
 import { useAuthStore } from '../store/authStore';
@@ -106,6 +109,11 @@ const showCareerPath = ref(false);
 const showSkillGap = ref(false);
 const showExamPlan = ref(false);
 
+/** 可选模型列表（仅职规大师开放模型切换） */
+const chatModels = ref<ChatModelOption[]>([]);
+/** 当前选中模型（localStorage 记住选择） */
+const selectedModel = ref(localStorage.getItem('love_master_model') || '');
+
 function updateResponsive() {
   isMobile.value = window.innerWidth < 768;
   if (isMobile.value) sidebarOpen.value = false;
@@ -118,6 +126,16 @@ onMounted(async () => {
   await store.initFromServer();
   store.ensureCurrentConversation();
   authStore.fetchAvatar();
+  // 拉取可选模型列表（失败不影响主流程），选中值回落到默认模型
+  getChatModels()
+    .then((res) => {
+      chatModels.value = res.data ?? [];
+      if (chatModels.value.length) {
+        const valid = chatModels.value.some((m) => m.id === selectedModel.value);
+        if (!valid) selectedModel.value = chatModels.value.find((m) => m.default)?.id ?? chatModels.value[0].id;
+      }
+    })
+    .catch(() => {});
   window.addEventListener('resize', updateResponsive);
 });
 
@@ -162,12 +180,15 @@ async function sendToAI(msg: string) {
       {
         message: msg,
         conversationId: convId ?? '',
+        model: selectedModel.value || undefined,
       },
       (chunk) => typewriter.feed(chunk),
       (id) => store.setBackendConversationId(id),
       (err) => ElMessage.error(err),
       ctrl.signal,
     );
+    // 记住本次选择的模型（下次进入页面沿用）
+    if (selectedModel.value) localStorage.setItem('love_master_model', selectedModel.value);
   } catch (e: unknown) {
     const aborted = (e as Error)?.name === 'AbortError';
     if (!aborted) {

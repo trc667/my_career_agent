@@ -16,7 +16,7 @@ function getAuthHeader(): Record<string, string> {
 
 /** 页面 1：RAG 流式对话 */
 export async function postChatStream(
-  body: { message: string; conversationId: string },
+  body: { message: string; conversationId: string; model?: string },
   onChunk: (text: string) => void,
   onConversationId?: (id: string) => void,
   onError?: (err: string) => void,

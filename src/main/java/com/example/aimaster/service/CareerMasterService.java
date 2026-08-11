@@ -21,13 +21,15 @@ public interface CareerMasterService {
 
     /**
      * 带 RAG 的多轮对话：先检索知识库得到参考上下文，再与历史、当前问题一起组 Prompt 调用模型。
+     * model 为可选模型名（空则默认 qwen-plus），按实际 token 消耗积分。
      */
-    ChatResponse chatWithRag(String conversationId, String userMessage);
+    ChatResponse chatWithRag(String conversationId, String userMessage, String model);
 
     /**
      * 带 RAG 的流式对话，返回 Flux 逐字输出。
+     * model 为可选模型名（空则默认 qwen-plus），按实际 token 消耗积分。
      */
-    com.example.aimaster.dto.ChatStreamSession chatWithRagStream(String conversationId, String userMessage);
+    com.example.aimaster.dto.ChatStreamSession chatWithRagStream(String conversationId, String userMessage, String model);
 
     /**
      * 根据主题生成职规/学习建议报告（结构化输出 JSON）。

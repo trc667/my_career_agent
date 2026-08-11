@@ -6,7 +6,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
+import com.example.aimaster.config.ModelCatalog;
 import com.example.aimaster.dto.ChatResponse;
 import com.example.aimaster.dto.ChatStreamSession;
 import com.example.aimaster.dto.CareerReport;
@@ -83,6 +85,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
 
     private final ChatModel chatModel;
     private final StreamingChatModel streamingChatModel;
+    private final ModelCatalog modelCatalog;
     private final String systemPrompt;
     private final ConversationMemoryStore memoryStore;
     private final ContextCompressor contextCompressor;
@@ -106,6 +109,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
     public CareerMasterServiceImpl(
             ChatModel chatModel,
             @Autowired(required = false) StreamingChatModel streamingChatModel,
+            ModelCatalog modelCatalog,
             @Qualifier("careerMasterSystemPrompt") String systemPrompt,
             ConversationMemoryStore memoryStore,
             ContextCompressor contextCompressor,
@@ -127,6 +131,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             @Value("${app.rag.hyde.length-threshold:40}") int hydeLengthThreshold) {
         this.chatModel = chatModel;
         this.streamingChatModel = streamingChatModel;
+        this.modelCatalog = modelCatalog;
         this.systemPrompt = systemPrompt;
         this.memoryStore = memoryStore;
         this.contextCompressor = contextCompressor;
@@ -412,7 +417,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
     }
 
     @Override
-    public ChatResponse chatWithRag(String conversationId, String userMessage) {
+    public ChatResponse chatWithRag(String conversationId, String userMessage, String model) {
         String id = conversationId != null && !conversationId.isBlank()
                 ? conversationId.trim()
                 : UUID.randomUUID().toString();
@@ -432,7 +437,9 @@ public class CareerMasterServiceImpl implements CareerMasterService {
             return ChatResponse.builder().conversationId(id).usageTokens(0).reply(cached).build();
         }
 
-        String costMsg = tryConsume(currentUsername(), CHAT_COST);
+        // 模型白名单解析 + 余额预检（至少 1 分，VIP/ADMIN 不检）
+        String resolved = modelCatalog.resolve(model);
+        String costMsg = tryPrecheck(currentUsername(), resolved);
         if (costMsg != null) {
             return ChatResponse.builder().conversationId(id).reply(costMsg).build();
         }
@@ -441,7 +448,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         String context = retrieveRagContext(buildSearchQuery(id, input));
         String systemWithContext = systemPrompt.replace("{context}", context != null ? context : "");
         List<Message> msgList = buildPromptMessages(id, systemWithContext, input);
-        Prompt prompt = new Prompt(msgList);
+        Prompt prompt = new Prompt(msgList, ChatOptions.builder().model(resolved).build());
         org.springframework.ai.chat.model.ChatResponse call = chatModel.call(prompt);
         String reply = filterText(extractReplyText(call));
         Integer usage = call.getMetadata() != null && call.getMetadata().getUsage() != null
@@ -451,6 +458,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         memoryStore.add(id, new AssistantMessage(reply != null ? reply : ""));
         cacheIfFresh(id, userMessage, reply);
         rewardInviteOnFirstChat(id, currentUsername());
+        settleChatQuietly(currentUsername(), resolved, usage, reply);
 
         return ChatResponse.builder().conversationId(id).usageTokens(usage).reply(reply != null ? reply : "").build();
     }
@@ -473,7 +481,7 @@ public class CareerMasterServiceImpl implements CareerMasterService {
     }
 
     @Override
-    public ChatStreamSession chatWithRagStream(String conversationId, String userMessage) {
+    public ChatStreamSession chatWithRagStream(String conversationId, String userMessage, String model) {
         String id = conversationId != null && !conversationId.isBlank() ? conversationId.trim() : UUID.randomUUID().toString();
         String input = filterText(userMessage);
         String hint = checkFilteredEmpty(userMessage, input);
@@ -488,7 +496,9 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         if (cached != null) {
             return new ChatStreamSession(id, Flux.just(cached));
         }
-        String costMsg = tryConsume(currentUsername(), CHAT_COST);
+        // 模型白名单解析 + 余额预检（至少 1 分，VIP/ADMIN 不检）
+        String resolved = modelCatalog.resolve(model);
+        String costMsg = tryPrecheck(currentUsername(), resolved);
         if (costMsg != null) {
             return new ChatStreamSession(id, Flux.just(costMsg));
         }
@@ -499,7 +509,13 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         Flux<String> flux;
         if (streamingChatModel != null) {
             StringBuilder replyBuf = new StringBuilder();
-            flux = streamingChatModel.stream(new Prompt(msgList))
+            AtomicReference<Integer> usageRef = new AtomicReference<>(null);
+            flux = streamingChatModel.stream(new Prompt(msgList, ChatOptions.builder().model(resolved).build()))
+                    .doOnNext(r -> {
+                        if (r != null && r.getMetadata() != null && r.getMetadata().getUsage() != null) {
+                            usageRef.set(r.getMetadata().getUsage().getTotalTokens());
+                        }
+                    })
                     .mapNotNull(r -> r != null && r.getResult() != null && r.getResult().getOutput() != null ? r.getResult().getOutput().getText() : null)
                     .filter(s -> s != null && !s.isEmpty())
                     .map(this::filterText)
@@ -507,13 +523,52 @@ public class CareerMasterServiceImpl implements CareerMasterService {
                     .doOnComplete(() -> {
                         cacheIfFresh(id, userMessage, replyBuf.toString());
                         rewardInviteOnFirstChat(id, currentUsername());
+                        settleChatQuietly(currentUsername(), resolved, usageRef.get(), replyBuf.toString());
                     });
         } else {
-            String fullReply = filterText(extractReplyText(chatModel.call(new Prompt(msgList))));
+            org.springframework.ai.chat.model.ChatResponse call = chatModel.call(
+                    new Prompt(msgList, ChatOptions.builder().model(resolved).build()));
+            String fullReply = filterText(extractReplyText(call));
+            Integer usage = call.getMetadata() != null && call.getMetadata().getUsage() != null
+                    ? call.getMetadata().getUsage().getTotalTokens()
+                    : null;
             cacheIfFresh(id, userMessage, fullReply);
+            rewardInviteOnFirstChat(id, currentUsername());
+            settleChatQuietly(currentUsername(), resolved, usage, fullReply);
             flux = Flux.just(fullReply);
         }
         return new ChatStreamSession(id, flux);
+    }
+
+    /**
+     * 对话前余额预检：成功返回 null；积分不足返回提示文案（VIP/ADMIN 不检）。
+     */
+    private String tryPrecheck(String username, String model) {
+        try {
+            pointService.precheckChat(username, model);
+            return null;
+        } catch (BusinessException e) {
+            log.info("对话预检拦截: {}", e.getMessage());
+            return e.getMessage();
+        }
+    }
+
+    /**
+     * 对话结束按实际 token 结算积分（usage 缺失时按输出长度估算，避免白嫖）；
+     * 结算失败不影响对话主流程，只记日志。
+     */
+    private void settleChatQuietly(String username, String model, Integer usage, String reply) {
+        try {
+            int tokens = (usage != null && usage > 0) ? usage : estimateTokens(reply);
+            pointService.settleChat(username, model, tokens);
+        } catch (Exception e) {
+            log.warn("模型对话结算失败: username={} model={} err={}", username, model, e.getMessage());
+        }
+    }
+
+    /** token 估算兜底：中英混排约每 2 字符 1 token */
+    private int estimateTokens(String text) {
+        return text == null ? 0 : text.length() / 2;
     }
 
     @Override
