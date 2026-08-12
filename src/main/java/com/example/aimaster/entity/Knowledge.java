@@ -34,6 +34,10 @@ public class Knowledge {
     @TableField("content")
     private String content;
 
+    /** 八股随机题改写后的疑问句（落库持久化：改写一次永久生效，随机题零 LLM 调用） */
+    @TableField("question")
+    private String question;
+
     /** 1=启用参与检索，0=停用（停用段不进索引，前端八股列表同步隐藏） */
     @TableField("enabled")
     private Integer enabled;

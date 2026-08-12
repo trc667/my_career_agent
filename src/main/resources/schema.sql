@@ -320,8 +320,19 @@ CREATE TABLE IF NOT EXISTS knowledge (
     category VARCHAR(32) DEFAULT '综合',
     content TEXT NOT NULL,
     enabled TINYINT DEFAULT 1 COMMENT '1=启用参与检索,0=停用',
+    question VARCHAR(255) DEFAULT NULL COMMENT '八股随机题改写后的疑问句（落库持久化，改写一次零 LLM）',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_knowledge_category (category),
     KEY idx_knowledge_enabled (enabled)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 兼容已存在的 knowledge 表：若缺少 question 列则补充（八股随机题疑问句落库）
+SET @has_kq := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'knowledge' AND COLUMN_NAME = 'question');
+SET @ddl_kq := IF(@has_kq = 0,
+    'ALTER TABLE knowledge ADD COLUMN question VARCHAR(255) DEFAULT NULL',
+    'SELECT 1');
+PREPARE stmt_kq FROM @ddl_kq;
+EXECUTE stmt_kq;
+DEALLOCATE PREPARE stmt_kq;

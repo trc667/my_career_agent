@@ -1,6 +1,10 @@
 package com.example.aimaster.service;
 
+import com.example.aimaster.entity.Knowledge;
+import com.example.aimaster.mapper.KnowledgeMapper;
 import com.example.aimaster.rag.RagDocumentLoader;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -10,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,9 +61,13 @@ public class BaguService {
     private volatile List<BaguEntry> entries = new ArrayList<>();
     private final Random random = new Random();
     private final ChatModel chatModel;
+    private final KnowledgeMapper knowledgeMapper;
+    /** content → 知识段（含 question 列）：随机题改写结果回写 knowledge 表持久化，改写一次永久生效 */
+    private volatile Map<String, Knowledge> knowledgeIndex = new HashMap<>();
 
-    public BaguService(ChatModel chatModel) {
+    public BaguService(ChatModel chatModel, KnowledgeMapper knowledgeMapper) {
         this.chatModel = chatModel;
+        this.knowledgeMapper = knowledgeMapper;
         load();
     }
 
@@ -73,7 +82,7 @@ public class BaguService {
         }
     }
 
-    /** 重建八股内存缓存（知识库管理入口变更后调用）：以启用知识段列表替换旧缓存 */
+    /** 重建八股内存缓存（知识库管理入口变更后调用）：以启用知识段列表替换旧缓存，并同步加载 question 索引 */
     public void reload(List<String> paragraphs) {
         if (paragraphs == null) return;
         List<BaguEntry> rebuilt = new ArrayList<>(paragraphs.size());
@@ -82,7 +91,23 @@ public class BaguService {
             rebuilt.add(new BaguEntry(hashId(s), s, RagDocumentLoader.autoTag(s)));
         }
         entries = rebuilt;
+        reloadQuestionIndex();
         log.info("八股知识库重建完成：{} 段", entries.size());
+    }
+
+    /** 加载 knowledge 表 question 索引（content → 知识段），供随机题改写结果持久化复用 */
+    private void reloadQuestionIndex() {
+        try {
+            List<Knowledge> all = knowledgeMapper.selectList(
+                    new LambdaQueryWrapper<Knowledge>().eq(Knowledge::getEnabled, 1));
+            Map<String, Knowledge> idx = new HashMap<>(all.size() * 2);
+            for (Knowledge k : all) {
+                if (k.getContent() != null) idx.put(k.getContent(), k);
+            }
+            knowledgeIndex = idx;
+        } catch (Exception e) {
+            log.warn("knowledge question 索引加载失败（随机题降级为每次改写）: {}", e.getMessage());
+        }
     }
 
     /** 分类 + 关键词过滤 + 分页 */
@@ -145,14 +170,30 @@ public class BaguService {
         return new QuestionEntry(e.id(), toQuestion(e.content()), e.content(), e.category());
     }
 
-    /** 单条知识点 LLM 改写为问句：非问句结果/调用失败均降级返回原文，保证可用 */
+    /**
+     * 知识点 → 疑问句（优先读 knowledge 表已持久化的 question，其次原文已是问句，最后 LLM 改写并回写库）：
+     * 改写结果落库后，同一知识点后续随机题零 LLM 调用，重启也不丢。
+     */
     private String toQuestion(String content) {
+        Knowledge k = knowledgeIndex.get(content);
+        // 1) 知识库已有改写结果：直接返回（零 LLM）
+        if (k != null && k.getQuestion() != null && !k.getQuestion().isBlank()) {
+            return k.getQuestion();
+        }
+        // 2) 原文本身就是疑问句：直接回写并返回
+        String trimmed = content.trim();
+        if (trimmed.endsWith("？") || trimmed.endsWith("?")) {
+            persistQuestion(k, trimmed);
+            return trimmed;
+        }
+        // 3) LLM 改写并回写 knowledge 表（失败/非问句降级原文）
         try {
             String prompt = QUESTION_REWRITE_PROMPT.replace("{knowledge}", content);
             org.springframework.ai.chat.model.ChatResponse resp = chatModel.call(new Prompt(prompt));
             String text = resp.getResult() == null ? "" : resp.getResult().getOutput().getText();
             String q = text == null ? "" : text.trim().replaceAll("^[\"'\\u300c\\u300d]+|[\"'\\u300c\\u300d]+$", "");
             if (!q.isEmpty() && (q.endsWith("？") || q.endsWith("?"))) {
+                persistQuestion(k, q);
                 return q;
             }
             log.warn("八股题改写结果非问句，降级原文: {}", q);
@@ -160,6 +201,25 @@ public class BaguService {
         } catch (Exception e) {
             log.warn("八股题改写失败，降级原文: {}", e.getMessage());
             return content;
+        }
+    }
+
+    /** 改写结果回写 knowledge 表（question 列）+ 更新内存索引；失败仅告警不影响返回 */
+    private void persistQuestion(Knowledge k, String question) {
+        if (k == null || k.getId() == null) return;
+        try {
+            knowledgeMapper.update(null, new LambdaUpdateWrapper<Knowledge>()
+                    .eq(Knowledge::getId, k.getId())
+                    .set(Knowledge::getQuestion, question));
+            Map<String, Knowledge> idx = new HashMap<>(knowledgeIndex);
+            Knowledge copy = new Knowledge();
+            copy.setId(k.getId());
+            copy.setContent(k.getContent());
+            copy.setQuestion(question);
+            idx.put(k.getContent(), copy);
+            knowledgeIndex = idx;
+        } catch (Exception e) {
+            log.warn("八股题改写结果回写失败: {}", e.getMessage());
         }
     }
 
