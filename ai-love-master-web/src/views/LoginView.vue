@@ -37,6 +37,9 @@
             @keyup.enter="handleLogin"
           />
         </el-form-item>
+        <div class="auth-forgot-row">
+          <a class="auth-forgot" @click.prevent="openForgot">忘记密码？</a>
+        </div>
         <el-form-item>
           <el-button
             type="primary"
@@ -59,6 +62,39 @@
       </el-form>
     </div>
 
+    <!-- 忘记密码弹窗：两步（发验证码 → 重置密码） -->
+    <el-dialog v-model="forgotVisible" title="找回密码" width="min(92vw, 400px)" append-to-body class="forgot-dialog">
+      <div class="forgot">
+        <template v-if="forgotStep === 1">
+          <p class="forgot__tip">输入注册时的用户名或邮箱，系统会向注册邮箱发送验证码</p>
+          <el-input v-model="forgotAccount" placeholder="用户名或邮箱" size="large" clearable />
+          <el-button
+            type="primary"
+            :loading="forgotSending"
+            class="forgot__send"
+            @click="handleSendCode"
+          >
+            发送验证码
+          </el-button>
+        </template>
+        <template v-else>
+          <p class="forgot__tip">验证码已发送至注册邮箱（5 分钟内有效）</p>
+          <el-input v-model="forgotCode" placeholder="6 位验证码" size="large" maxlength="6" />
+          <el-input
+            v-model="forgotPassword"
+            type="password"
+            placeholder="新密码（6-64 位）"
+            size="large"
+            show-password
+          />
+          <div class="forgot__actions">
+            <el-button @click="forgotStep = 1">上一步</el-button>
+            <el-button type="primary" :loading="forgotResetting" @click="handleReset">重置密码</el-button>
+          </div>
+        </template>
+      </div>
+    </el-dialog>
+
     <div class="auth-page__status">
       <span class="auth-page__status-dot" />
       <span>AUTH MODULE · v1.0</span>
@@ -75,6 +111,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { User, Lock } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { useAuthStore } from '../store/authStore';
+import { forgotReset, forgotSendCode } from '../api/auth';
 import { ElMessage } from 'element-plus';
 import AuthDecor from '../components/AuthDecor.vue';
 
@@ -111,6 +148,57 @@ async function handleLogin() {
       loading.value = false;
     }
   });
+}
+
+/* ===== 忘记密码：两步弹窗（发送验证码 → 重置密码） ===== */
+const forgotVisible = ref(false);
+const forgotStep = ref(1);
+const forgotAccount = ref('');
+const forgotCode = ref('');
+const forgotPassword = ref('');
+const forgotSending = ref(false);
+const forgotResetting = ref(false);
+
+function openForgot() {
+  forgotStep.value = 1;
+  forgotAccount.value = '';
+  forgotCode.value = '';
+  forgotPassword.value = '';
+  forgotVisible.value = true;
+}
+
+async function handleSendCode() {
+  if (!forgotAccount.value.trim()) {
+    ElMessage.warning('请输入用户名或邮箱');
+    return;
+  }
+  forgotSending.value = true;
+  try {
+    await forgotSendCode(forgotAccount.value.trim());
+    ElMessage.success('验证码已发送，请查收邮箱');
+    forgotStep.value = 2;
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '发送失败，请稍后重试');
+  } finally {
+    forgotSending.value = false;
+  }
+}
+
+async function handleReset() {
+  if (!forgotCode.value.trim() || forgotPassword.value.length < 6) {
+    ElMessage.warning('请填写验证码和新密码（至少 6 位）');
+    return;
+  }
+  forgotResetting.value = true;
+  try {
+    await forgotReset(forgotAccount.value.trim(), forgotCode.value.trim(), forgotPassword.value);
+    ElMessage.success('密码重置成功，请使用新密码登录');
+    forgotVisible.value = false;
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '重置失败，请稍后重试');
+  } finally {
+    forgotResetting.value = false;
+  }
 }
 </script>
 
@@ -341,6 +429,126 @@ async function handleLogin() {
 .auth-agreement__link:hover,
 .auth-switch__link:hover {
   text-decoration: underline;
+}
+
+/* 忘记密码入口（密码框下方右对齐） */
+.auth-forgot-row {
+  text-align: right;
+  margin: 2px 0 6px;
+}
+
+.auth-forgot {
+  font-size: 13px;
+  color: #2f6bff;
+  cursor: pointer;
+  text-decoration: none;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.auth-forgot:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.theme-dark .auth-forgot {
+  color: #6ea8ff;
+}
+
+/* 忘记密码弹窗：两步表单 */
+.forgot {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.forgot__tip {
+  margin: 0;
+  font-size: 13px;
+  color: var(--app-text-secondary);
+  line-height: 1.6;
+}
+
+.forgot__send {
+  width: 100%;
+  border-radius: 50px;
+  background: linear-gradient(to right, #2f6bff, #17c3f8);
+  border: none;
+}
+
+.forgot__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.forgot__actions .el-button {
+  border-radius: 50px;
+  flex: 1;
+}
+
+.forgot :deep(.el-input__wrapper) {
+  border-radius: 10px;
+}
+
+/* 忘记密码入口（密码框下方右对齐） */
+.auth-forgot-row {
+  text-align: right;
+  margin: 2px 0 6px;
+}
+
+.auth-forgot {
+  font-size: 13px;
+  color: #2f6bff;
+  cursor: pointer;
+  text-decoration: none;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.auth-forgot:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.theme-dark .auth-forgot {
+  color: #6ea8ff;
+}
+
+/* 忘记密码弹窗：两步表单 */
+.forgot {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.forgot__tip {
+  margin: 0;
+  font-size: 13px;
+  color: var(--app-text-secondary);
+  line-height: 1.6;
+}
+
+.forgot__send {
+  width: 100%;
+  border-radius: 50px;
+  background: linear-gradient(to right, #2f6bff, #17c3f8);
+  border: none;
+}
+
+.forgot__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.forgot__actions .el-button {
+  border-radius: 50px;
+  flex: 1;
+}
+
+.forgot :deep(.el-input__wrapper) {
+  border-radius: 10px;
 }
 
 .auth-page__status {

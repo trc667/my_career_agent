@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS app_user (
     level VARCHAR(16) DEFAULT 'FREE' COMMENT '会员等级: FREE/VIP',
     vip_expire_at DATETIME DEFAULT NULL COMMENT 'VIP 到期时间',
     inviter_id BIGINT DEFAULT NULL COMMENT '邀请人用户ID（分享裂变）',
+    phone VARCHAR(20) DEFAULT NULL COMMENT '手机号（预留，手机号注册渠道）',
+    register_channel VARCHAR(16) DEFAULT 'EMAIL' COMMENT '注册渠道: EMAIL/PHONE（决定找回密码验证码发送渠道）',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_user_email (email)
@@ -84,6 +86,36 @@ SET @ddl7 := IF(@has_inviter = 0,
 PREPARE stmt7 FROM @ddl7;
 EXECUTE stmt7;
 DEALLOCATE PREPARE stmt7;
+
+-- 兼容已存在的 app_user 表：若缺少手机号列则补充（手机号注册渠道预留）
+SET @has_phone := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'app_user' AND COLUMN_NAME = 'phone');
+SET @ddl8 := IF(@has_phone = 0,
+    'ALTER TABLE app_user ADD COLUMN phone VARCHAR(20) DEFAULT NULL',
+    'SELECT 1');
+PREPARE stmt8 FROM @ddl8;
+EXECUTE stmt8;
+DEALLOCATE PREPARE stmt8;
+
+-- 兼容已存在的 app_user 表：若缺少注册渠道列则补充（找回密码按渠道发码）
+SET @has_channel := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'app_user' AND COLUMN_NAME = 'register_channel');
+SET @ddl9 := IF(@has_channel = 0,
+    'ALTER TABLE app_user ADD COLUMN register_channel VARCHAR(16) DEFAULT ''EMAIL''',
+    'SELECT 1');
+PREPARE stmt9 FROM @ddl9;
+EXECUTE stmt9;
+DEALLOCATE PREPARE stmt9;
+
+-- 兼容已存在的 app_user 表：若手机号未加唯一索引则补充（手机号注册防重）
+SET @has_phone_uk := (SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'app_user' AND INDEX_NAME = 'uk_user_phone');
+SET @ddl10 := IF(@has_phone_uk = 0,
+    'ALTER TABLE app_user ADD UNIQUE KEY uk_user_phone (phone)',
+    'SELECT 1');
+PREPARE stmt10 FROM @ddl10;
+EXECUTE stmt10;
+DEALLOCATE PREPARE stmt10;
 
 -- 积分流水表：可审计（谁/何时/为何/变了几），积分变更一律落此表
 CREATE TABLE IF NOT EXISTS point_log (

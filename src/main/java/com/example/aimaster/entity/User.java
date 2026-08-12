@@ -60,6 +60,14 @@ public class User {
     @TableField("inviter_id")
     private Long inviterId;
 
+    /** 手机号（预留：手机号注册渠道，找回密码时作为短信验证码渠道） */
+    @TableField("phone")
+    private String phone;
+
+    /** 注册渠道：EMAIL / PHONE（决定找回密码验证码发送渠道） */
+    @TableField("register_channel")
+    private String registerChannel;
+
     @TableField("created_at")
     private LocalDateTime createTime;
 

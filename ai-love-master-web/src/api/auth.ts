@@ -37,3 +37,23 @@ export function register(data: RegisterRequest) {
 export function sendEmailCode(email: string) {
   return http.post<any, ResultWrapper<null>>('/api/auth/send-code', { email });
 }
+
+/** 忘记密码第一步：发送找回验证码（按账号注册渠道分发邮箱/短信） */
+export function forgotSendCode(account: string) {
+  return http.post<any, ResultWrapper<null>>('/api/auth/forgot/send-code', { account });
+}
+
+/** 忘记密码第二步：校验验证码并重置密码 */
+export function forgotReset(account: string, code: string, newPassword: string) {
+  return http.post<any, ResultWrapper<null>>('/api/auth/forgot/reset', { account, code, newPassword });
+}
+
+/** 忘记密码第一步：发送找回验证码（按账号注册渠道分发邮箱/短信） */
+export function forgotSendCode(account: string) {
+  return http.post<any, ResultWrapper<null>>('/api/auth/forgot/send-code', { account });
+}
+
+/** 忘记密码第二步：校验验证码并重置密码 */
+export function forgotReset(account: string, code: string, newPassword: string) {
+  return http.post<any, ResultWrapper<null>>('/api/auth/forgot/reset', { account, code, newPassword });
+}

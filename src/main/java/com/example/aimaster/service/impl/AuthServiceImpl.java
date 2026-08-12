@@ -138,4 +138,59 @@ public class AuthServiceImpl implements AuthService {
         user.setUpdateTime(LocalDateTime.now());
         userMapper.updateById(user);
     }
+
+    /** 按账号（用户名或邮箱）查用户，优先用户名，其次邮箱 */
+    private User findUserByAccount(String account) {
+        String acc = account.trim();
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, acc));
+        if (user == null) {
+            user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getEmail, acc.toLowerCase()));
+        }
+        return user;
+    }
+
+    /** 注册渠道归一化：null/旧用户默认 EMAIL */
+    private String resolveChannel(User user) {
+        String channel = user.getRegisterChannel();
+        return channel == null || channel.isBlank() ? "EMAIL" : channel.toUpperCase();
+    }
+
+    @Override
+    public void forgotSendCode(String account, String ip) {
+        User user = findUserByAccount(account);
+        if (user == null) {
+            throw new BusinessException("账号不存在，请检查用户名或邮箱");
+        }
+        String channel = resolveChannel(user);
+        if ("PHONE".equals(channel)) {
+            // 手机号注册渠道预留：短信服务接入后在此发送短信验证码
+            throw new BusinessException("该账号为手机号注册，短信找回暂未开通，请联系管理员");
+        }
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
+            throw new BusinessException("该账号未绑定邮箱，无法找回密码");
+        }
+        // 复用邮箱验证码服务（场景=找回密码，邮件文案区分）
+        emailCodeService.sendCode(user.getEmail(), ip, "forgot");
+    }
+
+    @Override
+    public void forgotReset(String account, String code, String newPassword) {
+        User user = findUserByAccount(account);
+        if (user == null) {
+            throw new BusinessException("账号不存在，请检查用户名或邮箱");
+        }
+        String channel = resolveChannel(user);
+        if ("PHONE".equals(channel)) {
+            throw new BusinessException("该账号为手机号注册，短信找回暂未开通，请联系管理员");
+        }
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
+            throw new BusinessException("该账号未绑定邮箱，无法找回密码");
+        }
+        // 校验验证码（正确则消耗），通过后重置密码
+        emailCodeService.validate(user.getEmail(), code);
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setUpdateTime(LocalDateTime.now());
+        userMapper.updateById(user);
+        log.info("密码已重置: username={}", user.getUsername());
+    }
 }

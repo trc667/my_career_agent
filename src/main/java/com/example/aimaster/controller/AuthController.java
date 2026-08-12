@@ -2,6 +2,8 @@ package com.example.aimaster.controller;
 
 import com.example.aimaster.dto.AuthResponse;
 import com.example.aimaster.dto.EmailCodeRequest;
+import com.example.aimaster.dto.ForgotResetRequest;
+import com.example.aimaster.dto.ForgotSendCodeRequest;
 import com.example.aimaster.dto.LoginRequest;
 import com.example.aimaster.dto.RegisterRequest;
 import com.example.aimaster.dto.Result;
@@ -47,5 +49,19 @@ public class AuthController {
     public Result<Void> sendCode(@Valid @RequestBody EmailCodeRequest req, HttpServletRequest request) {
         emailCodeService.sendCode(req.getEmail(), request.getRemoteAddr());
         return Result.ok("验证码已发送，请查收邮件", null);
+    }
+
+    /** 忘记密码第一步：发送找回密码验证码（按账号注册渠道分发邮箱/短信） */
+    @PostMapping("/forgot/send-code")
+    public Result<Void> forgotSendCode(@Valid @RequestBody ForgotSendCodeRequest req, HttpServletRequest request) {
+        authService.forgotSendCode(req.getAccount(), request.getRemoteAddr());
+        return Result.ok("验证码已发送，请查收", null);
+    }
+
+    /** 忘记密码第二步：校验验证码并重置密码 */
+    @PostMapping("/forgot/reset")
+    public Result<Void> forgotReset(@Valid @RequestBody ForgotResetRequest req) {
+        authService.forgotReset(req.getAccount(), req.getCode(), req.getNewPassword());
+        return Result.ok("密码重置成功，请使用新密码登录", null);
     }
 }

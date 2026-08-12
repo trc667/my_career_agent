@@ -75,13 +75,21 @@ public class EmailCodeService {
     }
 
     /**
-     * 发送验证码到指定邮箱。
+     * 发送验证码到指定邮箱（默认注册场景）。
      * 冷却期内重复调用抛业务异常；发送失败抛业务异常。
      *
      * @param email 目标邮箱
      * @param ip    客户端 IP（用于频率限制，可空）
      */
     public void sendCode(String email, String ip) {
+        sendCode(email, ip, "register");
+    }
+
+    /**
+     * 发送验证码到指定邮箱（可指定场景：register 注册 / forgot 找回密码）。
+     * 同一邮箱的验证码池共用（都用于证明邮箱所有权，场景间天然隔离：注册邮箱必未注册、找回邮箱必有用户）。
+     */
+    public void sendCode(String email, String ip, String scene) {
         checkIpLimit(ip);
         String key = email.toLowerCase().trim();
         if (!canSend(key)) {
@@ -91,6 +99,7 @@ public class EmailCodeService {
         long now = System.currentTimeMillis();
         codes.put(key, new CodeEntry(code, now + CODE_EXPIRE_MS, now));
 
+        String sceneName = "forgot".equals(scene) ? "找回密码" : "注册";
         try {
             MimeMessage mime = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mime, "UTF-8");
@@ -98,13 +107,13 @@ public class EmailCodeService {
                 helper.setFrom(mailFrom);
             }
             helper.setTo(key);
-            helper.setSubject("【AI 职规助手】邮箱验证码");
-            helper.setText(buildHtmlCodeEmail(code), true);
+            helper.setSubject("【AI 职规助手】" + sceneName + "验证码");
+            helper.setText(buildHtmlCodeEmail(code, sceneName), true);
             mailSender.send(mime);
-            log.info("验证码已发送至 {}", key);
+            log.info("{}验证码已发送至 {}", sceneName, key);
         } catch (Exception e) {
             codes.remove(key);
-            log.warn("验证码发送失败 {}: {}", key, e.getMessage());
+            log.warn("{}验证码发送失败 {}: {}", sceneName, key, e.getMessage());
             throw new BusinessException("邮件发送失败，请检查邮箱地址或稍后重试");
         }
     }
@@ -123,8 +132,11 @@ public class EmailCodeService {
         codes.remove(key);
     }
 
-    /** 构建 HTML 验证码邮件（内联样式，兼容主流邮件客户端） */
-    private String buildHtmlCodeEmail(String code) {
+    /** 构建 HTML 验证码邮件（内联样式，兼容主流邮件客户端），sceneName 用于区分注册/找回密码文案 */
+    private String buildHtmlCodeEmail(String code, String sceneName) {
+        String actionDesc = "找回密码".equals(sceneName)
+                ? "您正在重置 <b style=\"color:#409eff;\">AI 职规助手</b> 的登录密码，本次的验证码是："
+                : "您正在注册 <b style=\"color:#409eff;\">AI 职规助手</b>，本次的邮箱验证码是：";
         return """
             <div style="max-width:480px;margin:0 auto;padding:24px;font-family:'PingFang SC','Microsoft YaHei','Helvetica Neue',Arial,sans-serif;background:#f0f2f5;border-radius:16px;">
               <div style="text-align:center;padding:8px 0 20px;">
@@ -132,7 +144,10 @@ public class EmailCodeService {
                 <div style="font-size:18px;font-weight:bold;color:#303133;margin-top:10px;">🎓 AI 职规助手</div>
               </div>
               <div style="background:#ffffff;border-radius:12px;padding:28px 24px;box-shadow:0 8px 24px rgba(0,0,0,.05);">
-                <div style="font-size:14px;color:#606266;">您好，您正在注册 <b style="color:#409eff;">AI 职规助手</b>，本次的邮箱验证码是：</div>
+                <div style="font-size:14px;color:#606266;">"""
+                + actionDesc
+                + """
+                </div>
                 <div style="text-align:center;margin:20px 0;padding:16px;background:#f0f7ff;border:1px dashed rgba(64,158,255,.4);border-radius:10px;">
                   <span style="font-size:38px;font-weight:bold;color:#409eff;letter-spacing:10px;font-family:Consolas,Menlo,monospace;">
                 """
