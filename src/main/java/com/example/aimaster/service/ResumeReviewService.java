@@ -54,32 +54,39 @@ public class ResumeReviewService {
     private final ResumeReviewMapper resumeReviewMapper;
     private final ObjectMapper objectMapper;
     private final SensitiveWordFilter sensitiveWordFilter;
+    private final PointService pointService;
 
     public ResumeReviewService(ChatModel chatModel,
                                HybridRetriever hybridRetriever,
                                ResumeReviewMapper resumeReviewMapper,
                                ObjectMapper objectMapper,
-                               @Autowired(required = false) SensitiveWordFilter sensitiveWordFilter) {
+                               @Autowired(required = false) SensitiveWordFilter sensitiveWordFilter,
+                               PointService pointService) {
         this.chatModel = chatModel;
         this.hybridRetriever = hybridRetriever;
         this.resumeReviewMapper = resumeReviewMapper;
         this.objectMapper = objectMapper;
         this.sensitiveWordFilter = sensitiveWordFilter;
+        this.pointService = pointService;
     }
 
     /**
-     * 评分并保存记录。
+     * 评分并保存记录（调用前余额预检、结束后按 token 结算，防爆刷 LLM）。
      *
-     * @param userId 当前用户 ID（由 Controller 从 JWT 解析）
-     * @param req    简历内容 + 目标岗位
+     * @param userId   当前用户 ID（由 Controller 从 JWT 解析）
+     * @param username 当前用户名（积分预检/结算用，VIP/ADMIN 免扣）
+     * @param req      简历内容 + 目标岗位
      * @return 评分结果
      */
-    public ResumeReviewResult review(Long userId, ResumeReviewRequest req) {
+    public ResumeReviewResult review(Long userId, String username, ResumeReviewRequest req) {
         String resumeText = filter(req.getResumeText() == null ? "" : req.getResumeText());
         if (resumeText == null || resumeText.isBlank()) {
             throw new BusinessException("简历内容不能为空");
         }
         String targetPosition = req.getTargetPosition() != null ? req.getTargetPosition().trim() : "";
+
+        // 积分预检：余额 ≥1 分才放行（VIP/ADMIN 不检），防 0 分用户刷评分
+        pointService.precheckFeature(username, "AI 简历评分");
 
         // 1. 检索知识库中的简历写作规范作为评分依据（失败降级跳过，不阻塞评分）
         String context = "";
@@ -105,6 +112,18 @@ public class ResumeReviewService {
             org.springframework.ai.chat.model.ChatResponse response =
                     chatModel.call(new Prompt(List.of(new SystemMessage(systemPrompt), new UserMessage(userText))));
             raw = extractReplyText(response);
+            // 按实际 token 结算（usage 缺失按输出长度估算防白嫖），失败不影响主流程
+            try {
+                Integer usage = response != null && response.getMetadata() != null
+                        && response.getMetadata().getUsage() != null
+                        ? response.getMetadata().getUsage().getTotalTokens() : null;
+                int tokens = (usage != null && usage > 0) ? usage : (raw == null ? 0 : raw.length() / 2);
+                pointService.settleFeature(username, "AI 简历评分", "qwen-plus", tokens);
+            } catch (Exception ex) {
+                log.warn("简历评分结算失败: {}", ex.getMessage());
+            }
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             log.error("简历评分调用模型失败", e);
             throw new BusinessException("评分服务暂时不可用，请稍后重试");

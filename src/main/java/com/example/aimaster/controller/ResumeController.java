@@ -49,12 +49,13 @@ public class ResumeController {
         return user != null ? user.getId() : null;
     }
 
-    /** POST /api/resume/review 评分并保存 */
+    /** POST /api/resume/review 评分并保存（带积分预检/结算，防爆刷 LLM） */
     @PostMapping("/review")
     public Result<ResumeReviewResult> review(@Valid @RequestBody ResumeReviewRequest req) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         Long userId = currentUserId();
         if (userId == null) return Result.fail(401, "未登录或账号不存在");
-        return Result.ok(resumeReviewService.review(userId, req));
+        return Result.ok(resumeReviewService.review(userId, auth.getName(), req));
     }
 
     /** GET /api/resume/reviews 历史概要列表 */

@@ -577,8 +577,24 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         if (inputTopic == null) {
             inputTopic = "计算机专业校招准备与学习路线";
         }
+        // 积分预检：余额 ≥1 分才放行（VIP/ADMIN 不检），防 0 分用户刷报告
+        try {
+            pointService.precheckFeature(currentUsername(), "AI 职规报告");
+        } catch (BusinessException e) {
+            return new CareerReport("报告", List.of(e.getMessage()), "积分不足");
+        }
         Prompt prompt = new Prompt(List.of(new SystemMessage(REPORT_SYSTEM_PROMPT), new UserMessage("请为「" + inputTopic + "」生成职规/学习建议报告。")));
-        String raw = extractReplyText(chatModel.call(prompt));
+        org.springframework.ai.chat.model.ChatResponse resp = chatModel.call(prompt);
+        String raw = extractReplyText(resp);
+        // 按实际 token 结算（usage 缺失按输出长度估算防白嫖），失败不影响主流程
+        try {
+            Integer usage = resp != null && resp.getMetadata() != null && resp.getMetadata().getUsage() != null
+                    ? resp.getMetadata().getUsage().getTotalTokens() : null;
+            int tokens = (usage != null && usage > 0) ? usage : estimateTokens(raw);
+            pointService.settleFeature(currentUsername(), "AI 职规报告", "qwen-plus", tokens);
+        } catch (Exception e) {
+            log.warn("职规报告结算失败: {}", e.getMessage());
+        }
         if (raw == null || raw.isBlank()) return new CareerReport("报告", List.of("暂无建议"), "请稍后重试");
         String json = raw;
         if (raw.contains("```")) {

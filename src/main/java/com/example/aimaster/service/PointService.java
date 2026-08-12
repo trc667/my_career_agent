@@ -194,13 +194,23 @@ public class PointService {
      * 余额 ≥ 1 分放行（每次对话至少 1 分），VIP/ADMIN 不检。
      */
     public void precheckChat(String username, String model) {
+        precheckBalance(username, modelCatalog.nameOf(model) + " 对话");
+    }
+
+    /** 功能调用前预检（简历评分/职规报告等非对话场景）：余额 ≥1 分放行，VIP/ADMIN 不检。 */
+    public void precheckFeature(String username, String scene) {
+        precheckBalance(username, scene);
+    }
+
+    /** 余额预检公共逻辑：不足抛 BusinessException（costHint 如 "qwen-plus 对话"/"AI 简历评分"） */
+    private void precheckBalance(String username, String costHint) {
         if (username == null || username.isBlank()) return;
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username.trim()));
         if (user == null) return;
         if ("ADMIN".equals(user.getRole()) || "VIP".equals(user.getLevel())) return;
         int points = user.getPoints() == null ? 0 : user.getPoints();
         if (points < 1) {
-            throw new BusinessException("积分不足：" + modelCatalog.nameOf(model) + " 对话至少消耗 1 积分，请先到个人中心签到获取");
+            throw new BusinessException("积分不足：" + costHint + "至少消耗 1 积分，请先到个人中心签到获取");
         }
     }
 
@@ -210,13 +220,23 @@ public class PointService {
      * 余额不足时按剩余扣到 0（对话已完成不拦用户，但流水审计完整、不会为负）。
      */
     public void settleChat(String username, String model, int totalTokens) {
+        settleBalance(username, "AI 对话消耗", model, totalTokens);
+    }
+
+    /** 功能结束按实际 token 结算（简历评分/职规报告等非对话场景），流水原因带场景名便于审计。 */
+    public void settleFeature(String username, String scene, String model, int totalTokens) {
+        settleBalance(username, scene, model, totalTokens);
+    }
+
+    /** 按 token 结算公共逻辑：cost = max(1, ceil(tokens/1000) × 费率)；余额不足扣到 0 保审计。 */
+    private void settleBalance(String username, String scene, String model, int totalTokens) {
         if (username == null || username.isBlank()) return;
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username.trim()));
         if (user == null) return;
         if ("ADMIN".equals(user.getRole()) || "VIP".equals(user.getLevel())) return;
         int rate = modelCatalog.rateOf(model);
         int cost = Math.max(1, (int) Math.ceil((Math.max(totalTokens, 0) / 1000.0)) * rate);
-        String reason = "AI 对话消耗:" + modelCatalog.resolve(model);
+        String reason = scene + ":" + modelCatalog.resolve(model);
         int rows = userMapper.update(null, new UpdateWrapper<User>()
                 .setSql("points = points - " + cost)
                 .eq("id", user.getId())
