@@ -4,6 +4,7 @@ import com.example.aimaster.dto.Result;
 import com.example.aimaster.service.BaguService;
 import com.example.aimaster.service.BaguService.BaguEntry;
 import com.example.aimaster.service.BaguService.BaguPage;
+import com.example.aimaster.service.BaguService.QuestionEntry;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,10 +42,10 @@ public class BaguController {
         return Result.ok(baguService.categories());
     }
 
-    /** GET /api/bagu/random?category=后端 随机抽一条（可限定分类） */
+    /** GET /api/bagu/random?category=后端 随机抽一条（可限定分类），题目为 LLM 改写的疑问句 */
     @GetMapping("/random")
-    public Result<BaguEntry> random(@RequestParam(required = false) String category) {
-        BaguEntry entry = baguService.random(category);
+    public Result<QuestionEntry> random(@RequestParam(required = false) String category) {
+        QuestionEntry entry = baguService.randomQuestion(category);
         if (entry == null) {
             return Result.fail(400, "该分类下暂无内容");
         }

@@ -60,6 +60,8 @@
 21. **模型切换 + 差异化计费**（Qoder 模式）：聊天页模型选择器（qwen-turbo/plus/max + deepseek-v3/r1，5 模型白名单），不同模型按**实际 token 消耗 × 模型费率（积分/千 token）**结算积分；调用前预检余额（≥1 分）、结束后按 usage 结算（usage 缺失按输出长度估算防白嫖）；VIP/ADMIN 免扣；FAQ/缓存命中不扣；非法模型名回落默认；`/api/models` 公开展示模型与费率；选择 localStorage 持久化（`ModelCatalog`/`PointService.precheckChat+settleChat`/`ChatInputBar` 模型下拉/`LoveMasterView`）
 22. **邀请海报（分享裂变补全）**：个人中心邀请卡片新增「保存海报」——canvas 绘制品牌海报（品牌蓝渐变 + 装饰圆环 + 标题/宣传语 + 白底圆角二维码卡片 + 邀请链接），弹窗展示支持下载 PNG（600x850 适配手机长按保存），配合既有专属链接/复制/二维码形成完整分享链路（`UserCenterView.drawPoster`/`openPoster`/`downloadPoster`）
 23. **忘记密码（找回密码）**：登录页新增「忘记密码」两步弹窗（发验证码 → 重置）；后端按账号（用户名或邮箱）查用户，**按注册渠道（register_channel: EMAIL/PHONE）分发验证码**——邮箱渠道复用 EmailCodeService（场景化邮件文案），手机号渠道预留（短信服务接入后启用）；验证码 5 分钟有效 + 60s 冷却 + IP 限流；app_user 新增 phone/register_channel 列（兼容 DDL）（`AuthService.forgotSendCode/forgotReset`/`EmailCodeService.sendCode(email,ip,scene)`/`ForgotSendCodeRequest`/`ForgotResetRequest`/`LoginView` 忘记密码弹窗）
+24. **八股随机题改疑问句**：八股练习场「随机一题」抽题后经 LLM 改写为可直接作答的面试问句（失败降级原文）；弹窗题目高亮展示 + 「查看参考答案」折叠原文知识点；错题本存改写后的题目、AI 讲解结合题目+原文（`BaguService.randomQuestion/toQuestion`/`GET /api/bagu/random` 返回 question+content/`BaguView` 随机弹窗）
+24. **八股随机题改疑问句**：八股练习场「随机一题」抽题后经 LLM 改写为可直接作答的面试问句（失败降级原文）；弹窗题目高亮展示 + 「查看参考答案」折叠原文知识点；错题本存改写后的题目、AI 讲解结合题目+原文（`BaguService.randomQuestion/toQuestion`/`GET /api/bagu/random` 返回 question+content/`BaguView` 随机弹窗）
 
 ## 四、本轮任务进度（已完成并验证）
 

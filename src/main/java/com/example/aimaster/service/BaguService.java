@@ -2,6 +2,8 @@ package com.example.aimaster.service;
 
 import com.example.aimaster.rag.RagDocumentLoader;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -37,10 +39,26 @@ public class BaguService {
     public record BaguPage(List<BaguEntry> list, long total) {
     }
 
+    /** 随机一题结果：question 为 LLM 改写后的疑问句，content 为原文知识点（供 AI 讲解/参考） */
+    public record QuestionEntry(String id, String question, String content, String category) {
+    }
+
+    /** 抽题后 LLM 改写 Prompt：把陈述句知识点转成可直接作答的八股问句 */
+    private static final String QUESTION_REWRITE_PROMPT =
+            "你是一位资深技术面试官，正在出八股文面试题。\n"
+            + "下面是一条技术知识点，请把它改写成一道简短、可直接作答的面试问句：\n"
+            + "1) 以问号结尾，口语化，引导解释原理/原因/区别；\n"
+            + "2) 不要包含答案内容，保持简洁（不超过 50 字）；\n"
+            + "3) 若原文已是问句则润色后保留。\n"
+            + "知识点：{knowledge}\n"
+            + "只输出改写后的问题本身，不要输出其他任何文字。";
+
     private volatile List<BaguEntry> entries = new ArrayList<>();
     private final Random random = new Random();
+    private final ChatModel chatModel;
 
-    public BaguService() {
+    public BaguService(ChatModel chatModel) {
+        this.chatModel = chatModel;
         load();
     }
 
@@ -118,6 +136,31 @@ public class BaguService {
                 : entries.stream().filter(e -> e.category().equals(category)).toList();
         if (pool.isEmpty()) return null;
         return pool.get(random.nextInt(pool.size()));
+    }
+
+    /** 随机抽题并 LLM 改写为疑问句（碎片时间刷题用）；无候选返回 null，改写失败降级原文 */
+    public QuestionEntry randomQuestion(String category) {
+        BaguEntry e = random(category);
+        if (e == null) return null;
+        return new QuestionEntry(e.id(), toQuestion(e.content()), e.content(), e.category());
+    }
+
+    /** 单条知识点 LLM 改写为问句：非问句结果/调用失败均降级返回原文，保证可用 */
+    private String toQuestion(String content) {
+        try {
+            String prompt = QUESTION_REWRITE_PROMPT.replace("{knowledge}", content);
+            org.springframework.ai.chat.model.ChatResponse resp = chatModel.call(new Prompt(prompt));
+            String text = resp.getResult() == null ? "" : resp.getResult().getOutput().getText();
+            String q = text == null ? "" : text.trim().replaceAll("^[\"'\\u300c\\u300d]+|[\"'\\u300c\\u300d]+$", "");
+            if (!q.isEmpty() && (q.endsWith("？") || q.endsWith("?"))) {
+                return q;
+            }
+            log.warn("八股题改写结果非问句，降级原文: {}", q);
+            return content;
+        } catch (Exception e) {
+            log.warn("八股题改写失败，降级原文: {}", e.getMessage());
+            return content;
+        }
     }
 
     public int size() {

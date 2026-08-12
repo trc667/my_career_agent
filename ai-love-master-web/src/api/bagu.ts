@@ -21,6 +21,14 @@ export interface BaguCategory {
   count: number;
 }
 
+/** 随机一题：question 为 LLM 改写的疑问句，content 为原文知识点（供 AI 讲解/参考） */
+export interface BaguQuestion {
+  id: string;
+  question: string;
+  content: string;
+  category: string;
+}
+
 export interface BaguWrong {
   id: number;
   userId: number;
@@ -57,7 +65,7 @@ export function getBaguCategories() {
 }
 
 export function getBaguRandom(category?: string) {
-  return http.get<any, ResultWrapper<BaguEntry>>('/api/bagu/random', {
+  return http.get<any, ResultWrapper<BaguQuestion>>('/api/bagu/random', {
     params: category ? { category } : {},
   });
 }

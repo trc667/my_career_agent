@@ -74,7 +74,11 @@
     <el-dialog v-model="randomVisible" title="🎲 随机一题" width="min(560px, 92vw)">
       <template v-if="randomItem">
         <el-tag size="small" :type="tagType(randomItem.category)">{{ randomItem.category }}</el-tag>
-        <p class="bagu-random__content">{{ randomItem.content }}</p>
+        <p class="bagu-random__title">{{ randomItem.question }}</p>
+        <details class="bagu-random__answer">
+          <summary>📖 查看参考答案</summary>
+          <p class="bagu-random__content">{{ randomItem.content }}</p>
+        </details>
       </template>
       <template #footer>
         <el-button @click="handleRandom">再抽一题</el-button>
@@ -104,7 +108,7 @@
 import { onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
-import { getBaguCategories, getBaguList, getBaguRandom, addBaguWrong, type BaguCategory, type BaguEntry } from '../api/bagu';
+import { getBaguCategories, getBaguList, getBaguRandom, addBaguWrong, type BaguCategory, type BaguEntry, type BaguQuestion } from '../api/bagu';
 import { postChatRag } from '../api/chat';
 import { renderMarkdown } from '../utils/markdown';
 
@@ -119,7 +123,7 @@ const loading = ref(false);
 const expanded = ref<Record<number, boolean>>({});
 
 const randomVisible = ref(false);
-const randomItem = ref<BaguEntry | null>(null);
+const randomItem = ref<BaguQuestion | null>(null);
 const wrongLoading = ref(false);
 const explainVisible = ref(false);
 const explainLoading = ref(false);
@@ -187,15 +191,15 @@ async function handleRandom() {
   }
 }
 
-/** 加入错题本（不会/答错时） */
-async function handleAddWrong(item: BaguEntry | null) {
+/** 加入错题本（不会/答错时）：存改写后的疑问句作为题目 */
+async function handleAddWrong(item: BaguQuestion | null) {
   if (!item) return;
   wrongLoading.value = true;
   try {
     await addBaguWrong({
       questionId: item.id,
       category: item.category,
-      content: item.content,
+      content: item.question || item.content,
     });
     ElMessage.success('已加入错题本，可去「学习记录」查看');
   } catch {
@@ -205,15 +209,15 @@ async function handleAddWrong(item: BaguEntry | null) {
   }
 }
 
-/** AI 深入讲解：复用对话接口（chatWithRag） */
-async function handleExplain(item: BaguEntry | null) {
+/** AI 深入讲解：复用对话接口（chatWithRag），结合题目与原文知识点讲解 */
+async function handleExplain(item: BaguQuestion | null) {
   if (!item) return;
   explainVisible.value = true;
   explainLoading.value = true;
   explainText.value = '';
   try {
     const res = await postChatRag({
-      message: `请深入讲解以下计算机八股知识点，结合面试场景与追问展开，控制在 300 字内：\n${item.content}`,
+      message: `请深入讲解以下计算机八股题目，结合面试场景与追问展开，控制在 300 字内：\n题目：${item.question}\n参考知识点：${item.content}`,
     });
     explainText.value = res.data?.reply ?? 'AI 暂时无法回答，请稍后重试';
   } catch {
@@ -363,8 +367,31 @@ function tagType(cat: string): 'primary' | 'success' | 'warning' | 'danger' | 'i
   justify-content: center;
 }
 
-.bagu-random__content {
+.bagu-random__title {
   margin: 12px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.7;
+  color: var(--app-text);
+}
+
+.bagu-random__answer {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(47, 107, 255, 0.06);
+  border: 1px dashed rgba(47, 107, 255, 0.3);
+  border-radius: 10px;
+}
+
+.bagu-random__answer summary {
+  font-size: 13px;
+  color: #2f6bff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.bagu-random__content {
+  margin: 10px 0 0;
   font-size: 14px;
   line-height: 1.7;
   color: var(--app-text);
