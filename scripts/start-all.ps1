@@ -29,24 +29,26 @@ $cpolarExe = "C:\Users\tan\Desktop\cpolar\cpolar.exe"
 
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
-# ---------- 1. backend ----------
+# ---------- 1. backend (hidden window, log to logs\backend.log) ----------
 $be = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue
 if ($be) {
     Write-Host "[1/3] backend 8080 already running"
 } else {
-    Write-Host "[1/3] starting backend (Spring Boot, JDK17)..."
+    Write-Host "[1/3] starting backend (Spring Boot, JDK17, silent)..."
     $env:JAVA_HOME = "C:\Users\tan\.jdks\ms-17.0.16"
     $env:Path = "$env:JAVA_HOME\bin;$env:Path"
-    Start-Process powershell -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-File","$repoRoot\scripts\run-spring-boot-utf8.ps1" -WindowStyle Minimized
+    Start-Process powershell -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-File","$repoRoot\scripts\run-spring-boot-utf8.ps1" `
+        -RedirectStandardOutput (Join-Path $logDir "backend.log") -RedirectStandardError (Join-Path $logDir "backend.err.log") -WindowStyle Hidden
 }
 
-# ---------- 2. frontend ----------
+# ---------- 2. frontend (hidden window, log to logs\frontend.log) ----------
 $fe = Get-NetTCPConnection -LocalPort 5175 -State Listen -ErrorAction SilentlyContinue
 if ($fe) {
     Write-Host "[2/3] frontend 5175 already running"
 } else {
-    Write-Host "[2/3] starting frontend (Vite)..."
-    Start-Process powershell -ArgumentList "-NoProfile","-Command","Set-Location '$webDir'; npm run dev" -WindowStyle Minimized
+    Write-Host "[2/3] starting frontend (Vite, silent)..."
+    Start-Process powershell -ArgumentList "-NoProfile","-Command","Set-Location '$webDir'; npm run dev" `
+        -RedirectStandardOutput (Join-Path $logDir "frontend.log") -RedirectStandardError (Join-Path $logDir "frontend.err.log") -WindowStyle Hidden
 }
 
 # ---------- 3. cpolar dual tunnels ----------
