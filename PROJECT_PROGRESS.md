@@ -61,7 +61,7 @@
 22. **邀请海报（分享裂变补全）**：个人中心邀请卡片新增「保存海报」——canvas 绘制品牌海报（品牌蓝渐变 + 装饰圆环 + 标题/宣传语 + 白底圆角二维码卡片 + 邀请链接），弹窗展示支持下载 PNG（600x850 适配手机长按保存），配合既有专属链接/复制/二维码形成完整分享链路（`UserCenterView.drawPoster`/`openPoster`/`downloadPoster`）
 23. **忘记密码（找回密码）**：登录页新增「忘记密码」两步弹窗（发验证码 → 重置）；后端按账号（用户名或邮箱）查用户，**按注册渠道（register_channel: EMAIL/PHONE）分发验证码**——邮箱渠道复用 EmailCodeService（场景化邮件文案），手机号渠道预留（短信服务接入后启用）；验证码 5 分钟有效 + 60s 冷却 + IP 限流；app_user 新增 phone/register_channel 列（兼容 DDL）（`AuthService.forgotSendCode/forgotReset`/`EmailCodeService.sendCode(email,ip,scene)`/`ForgotSendCodeRequest`/`ForgotResetRequest`/`LoginView` 忘记密码弹窗）
 24. **八股随机题改疑问句**：八股练习场「随机一题」抽题后经 LLM 改写为可直接作答的面试问句（失败降级原文）；弹窗题目高亮展示 + 「查看参考答案」折叠原文知识点；错题本存改写后的题目、AI 讲解结合题目+原文（`BaguService.randomQuestion/toQuestion`/`GET /api/bagu/random` 返回 question+content/`BaguView` 随机弹窗）
-24. **八股随机题改疑问句**：八股练习场「随机一题」抽题后经 LLM 改写为可直接作答的面试问句（失败降级原文）；弹窗题目高亮展示 + 「查看参考答案」折叠原文知识点；错题本存改写后的题目、AI 讲解结合题目+原文（`BaguService.randomQuestion/toQuestion`/`GET /api/bagu/random` 返回 question+content/`BaguView` 随机弹窗）
+25. **八股题库扩充（小林 coding 风格）**：新增 36 条后端八股知识点（网络/OS/MySQL/Redis/Java/Spring 六大主题，行业公共知识自行组织语言，参考小林coding/JavaGuide 知识体系），知识库 629 → 665 段（`scripts/insert-bagu-knowledge.sql` 批量导入 knowledge 表 + rebuild 全量重建）
 
 ## 四、本轮任务进度（已完成并验证）
 
