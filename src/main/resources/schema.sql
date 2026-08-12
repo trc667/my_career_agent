@@ -336,3 +336,13 @@ SET @ddl_kq := IF(@has_kq = 0,
 PREPARE stmt_kq FROM @ddl_kq;
 EXECUTE stmt_kq;
 DEALLOCATE PREPARE stmt_kq;
+
+-- 新手引导任务领取记录：完成状态从业务表实时判定，本表只记领取（防重复领取，唯一约束幂等）
+CREATE TABLE IF NOT EXISTS user_task (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    task_key VARCHAR(32) NOT NULL COMMENT '任务标识: first_chat/first_sign/first_interview/first_redeem',
+    reward_points INT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_ut_user_task (user_id, task_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

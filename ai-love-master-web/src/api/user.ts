@@ -111,3 +111,25 @@ export interface WeeklyReport {
 export function getWeeklyReport() {
   return http.get<any, ResultWrapper<WeeklyReport>>('/api/user/weekly-report');
 }
+
+/* 新手引导任务（留存闭环：首聊/首签/首面/首兑得积分） */
+
+export interface GuideTask {
+  key: string;
+  name: string;
+  desc: string;
+  rewardPoints: number;
+  done: boolean;
+  claimed: boolean;
+  canClaim: boolean;
+}
+
+/** 新手任务列表 */
+export function getGuideTasks() {
+  return http.get<any, ResultWrapper<GuideTask[]>>('/api/user/tasks');
+}
+
+/** 领取新手任务奖励 */
+export function claimGuideTask(key: string) {
+  return http.post<any, ResultWrapper<number>>(`/api/user/tasks/${key}/claim`);
+}

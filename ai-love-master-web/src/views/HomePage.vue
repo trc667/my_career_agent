@@ -421,6 +421,7 @@ const marqueeItems = [
   { icon: '🏫', text: '校招备战', to: '/career-master' },
   { icon: '🛒', text: '积分商城', to: '/shop' },
   { icon: '📊', text: '学习周报', to: '/weekly-report' },
+  { icon: '🎯', text: '新手任务', to: '/user-center' },
   { icon: '🏅', text: '成就徽章', to: '/user-center' },
 ];
 

@@ -10,6 +10,7 @@ import com.example.aimaster.mapper.FeedbackMapper;
 import com.example.aimaster.mapper.UserMapper;
 import com.example.aimaster.service.AchievementService;
 import com.example.aimaster.service.AuthService;
+import com.example.aimaster.service.GuideTaskService;
 import com.example.aimaster.service.OssStorageService;
 import com.example.aimaster.service.PointService;
 import com.example.aimaster.service.WeeklyReportService;
@@ -17,6 +18,7 @@ import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,6 +44,7 @@ public class UserController {
     private final PointService pointService;
     private final AchievementService achievementService;
     private final WeeklyReportService weeklyReportService;
+    private final GuideTaskService guideTaskService;
 
     public UserController(AuthService authService,
                           FeedbackMapper feedbackMapper,
@@ -49,7 +52,8 @@ public class UserController {
                           UserMapper userMapper,
                           PointService pointService,
                           AchievementService achievementService,
-                          WeeklyReportService weeklyReportService) {
+                          WeeklyReportService weeklyReportService,
+                          GuideTaskService guideTaskService) {
         this.authService = authService;
         this.feedbackMapper = feedbackMapper;
         this.ossStorageService = ossStorageService;
@@ -57,6 +61,7 @@ public class UserController {
         this.pointService = pointService;
         this.achievementService = achievementService;
         this.weeklyReportService = weeklyReportService;
+        this.guideTaskService = guideTaskService;
     }
 
     /** 获取当前登录用户名（从 SecurityContext 取，JWT 过滤器已注入） */
@@ -162,5 +167,21 @@ public class UserController {
         Long userId = currentUserId();
         if (userId == null) return Result.fail(401, "未登录或账号不存在");
         return Result.ok(weeklyReportService.weekly(userId));
+    }
+
+    /** GET /api/user/tasks 新手引导任务列表（完成状态实时判定，含领取状态） */
+    @GetMapping("/tasks")
+    public Result<java.util.List<Map<String, Object>>> tasks() {
+        Long userId = currentUserId();
+        if (userId == null) return Result.fail(401, "未登录或账号不存在");
+        return Result.ok(guideTaskService.list(userId));
+    }
+
+    /** POST /api/user/tasks/{key}/claim 领取新手任务奖励（幂等防刷） */
+    @PostMapping("/tasks/{key}/claim")
+    public Result<Integer> claimTask(@PathVariable String key) {
+        Long userId = currentUserId();
+        if (userId == null) return Result.fail(401, "未登录或账号不存在");
+        return Result.ok("领取成功", guideTaskService.claim(userId, key));
     }
 }

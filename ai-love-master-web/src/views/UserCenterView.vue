@@ -65,6 +65,36 @@
         <p class="uc-points__tip">每日签到 +5 分，连续 7 天额外 +10；点赞 AI 回复 +2 分；积分可在「积分商城」兑换资料与 VIP 体验卡</p>
       </div>
 
+      <!-- 新手引导任务（留存闭环：完成关键动作得积分） -->
+      <div v-if="guideTasks.length" class="uc-tasks">
+        <div class="uc-tasks__head">
+          <h3 class="uc-tasks__title">🎯 新手任务</h3>
+          <span class="uc-tasks__total">全部完成可得 {{ guideTotal }} 积分</span>
+        </div>
+        <div
+          v-for="t in guideTasks"
+          :key="t.key"
+          class="uc-tasks__item"
+          :class="{ 'is-done': t.done, 'is-claimed': t.claimed }"
+        >
+          <span class="uc-tasks__icon">{{ taskIcon(t.key) }}</span>
+          <div class="uc-tasks__info">
+            <span class="uc-tasks__name">{{ t.name }} <em>+{{ t.rewardPoints }}</em></span>
+            <span class="uc-tasks__desc">{{ t.desc }}</span>
+          </div>
+          <el-button
+            v-if="t.canClaim"
+            type="primary"
+            size="small"
+            round
+            :loading="claimingKey === t.key"
+            @click="handleClaimTask(t)"
+          >领取</el-button>
+          <el-tag v-else-if="t.claimed" size="small" type="success" effect="plain">已领取</el-tag>
+          <el-tag v-else size="small" type="info" effect="plain">{{ t.done ? '可领取' : '未完成' }}</el-tag>
+        </div>
+      </div>
+
       <!-- 学习周报入口（数据资产沉淀） -->
       <router-link to="/weekly-report" class="uc-report">
         <span class="uc-report__icon">📊</span>
@@ -208,7 +238,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import { changePassword, getAchievements, getInvite, getPoints, getUserMe, signIn, uploadAvatar, type Achievement, type PointProfile, type UserInfo } from '../api/user';
+import { changePassword, claimGuideTask, getAchievements, getGuideTasks, getInvite, getPoints, getUserMe, signIn, uploadAvatar, type Achievement, type GuideTask, type PointProfile, type UserInfo } from '../api/user';
 import QRCode from 'qrcode';
 import { useCountUp } from '../composables/useCountUp';
 import { useAuthStore } from '../store/authStore';
@@ -230,6 +260,43 @@ const streakInCycle = computed(() => {
 });
 const remainToBonus = computed(() => 7 - streakInCycle.value);
 const streakPct = computed(() => Math.round((streakInCycle.value / 7) * 100));
+
+/* 新手引导任务 */
+const guideTasks = ref<GuideTask[]>([]);
+const claimingKey = ref('');
+const guideTotal = computed(() => guideTasks.value.reduce((s, t) => s + t.rewardPoints, 0));
+
+function taskIcon(key: string) {
+  const map: Record<string, string> = {
+    first_chat: '💬',
+    first_sign: '📅',
+    first_interview: '🎯',
+    first_redeem: '🛍️',
+  };
+  return map[key] ?? '✅';
+}
+
+async function loadGuideTasks() {
+  try {
+    const res = await getGuideTasks();
+    guideTasks.value = res.data ?? [];
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+async function handleClaimTask(t: GuideTask) {
+  claimingKey.value = t.key;
+  try {
+    const res = await claimGuideTask(t.key);
+    ElMessage.success(`奖励 +${res.data ?? t.rewardPoints} 积分已到账`);
+    await Promise.all([loadGuideTasks(), loadPoints()]);
+  } catch {
+    // 拦截器已提示
+  } finally {
+    claimingKey.value = '';
+  }
+}
 
 /* 成就徽章 */
 const achievements = ref<Achievement[]>([]);
@@ -458,6 +525,7 @@ onMounted(async () => {
   loadPoints();
   loadInvite();
   loadAchievements();
+  loadGuideTasks();
 });
 
 /** 上传/更换头像（el-upload 自定义请求） */
@@ -597,6 +665,100 @@ function handleLogout() {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* 新手引导任务卡片 */
+.uc-tasks {
+  margin-top: 18px;
+  padding: 16px;
+  background: linear-gradient(135deg, #fff7ec 0%, #fffdf8 100%);
+  border: 1px solid #ffe3bd;
+  border-radius: var(--app-radius-md);
+}
+
+.theme-dark .uc-tasks {
+  background: linear-gradient(135deg, #261f12 0%, #1a160d 100%);
+  border-color: #4a3a1e;
+}
+
+.uc-tasks__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.uc-tasks__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--app-text);
+}
+
+.uc-tasks__total {
+  font-size: 12px;
+  color: #d48806;
+}
+
+.theme-dark .uc-tasks__total {
+  color: #e6a23c;
+}
+
+.uc-tasks__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+
+.uc-tasks__item + .uc-tasks__item {
+  border-top: 1px dashed rgba(47, 107, 255, 0.12);
+}
+
+.uc-tasks__item:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.theme-dark .uc-tasks__item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.uc-tasks__item.is-done .uc-tasks__name,
+.uc-tasks__item.is-claimed .uc-tasks__name {
+  color: var(--app-text-secondary);
+}
+
+.uc-tasks__icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.uc-tasks__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.uc-tasks__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--app-text);
+}
+
+.uc-tasks__name em {
+  font-style: normal;
+  color: #2f6bff;
+  font-weight: 700;
+}
+
+.uc-tasks__desc {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+  line-height: 1.4;
 }
 
 .uc-report {
