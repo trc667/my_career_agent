@@ -31,9 +31,9 @@
           class="resume-submit pixel-btn"
           :loading="loading"
           :disabled="!resumeText.trim() || loading"
-          @click="handleReview"
+          @click="handleAnalyze"
         >
-          {{ loading ? 'AI 正在评审简历…' : '开始评分' }}
+          {{ loading ? 'AI 正在分析简历…' : '开始分析（1 积分）' }}
         </el-button>
       </section>
 
@@ -88,18 +88,34 @@
             </div>
           </div>
 
-          <div v-if="result.improvedResume" class="resume-section">
+          <div class="resume-section">
             <div class="resume-section__title resume-section__title--row">
               优化版简历
-              <el-button size="small" type="primary" plain class="pixel-btn" @click="copyResume">复制全文</el-button>
+              <el-button
+                v-if="result.improvedResume"
+                size="small"
+                type="primary"
+                plain
+                class="pixel-btn"
+                @click="copyResume"
+              >复制全文</el-button>
+              <el-button
+                v-else
+                size="small"
+                type="primary"
+                class="pixel-btn"
+                :loading="optimizing"
+                @click="handleOptimize"
+              >生成优化版（2 积分）</el-button>
             </div>
-            <pre class="resume-improved">{{ result.improvedResume }}</pre>
+            <pre v-if="result.improvedResume" class="resume-improved">{{ result.improvedResume }}</pre>
+            <p v-else class="resume-optimize-tip">基于上面的评分意见生成优化后的完整简历（约 1 分钟），消耗 2 积分</p>
           </div>
         </template>
         <div v-else-if="loading" class="resume-loading">
           <el-icon class="is-loading resume-loading__icon"><Loading /></el-icon>
-          <p class="resume-loading__title">AI 正在深度评审简历…</p>
-          <p class="resume-loading__desc">正在从 6 个维度分析并生成优化建议<br />长简历（3000+ 字）约需 1-2 分钟，请耐心等待</p>
+          <p class="resume-loading__title">AI 正在分析简历…</p>
+          <p class="resume-loading__desc">正在从 6 个维度分析并生成评分意见<br />通常 30 秒内完成，请稍候</p>
         </div>
         <div v-else class="resume-empty">
           <div class="resume-empty__icon">📄</div>
@@ -144,7 +160,8 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 import { useLoveMasterStore } from '../store/loveMasterStore';
 import {
-  reviewResume,
+  analyzeResume,
+  optimizeResume,
   listResumeReviews,
   getResumeReview,
   deleteResumeReview,
@@ -158,6 +175,8 @@ const theme = store.theme;
 const resumeText = ref('');
 const targetPosition = ref('');
 const loading = ref(false);
+const optimizing = ref(false);
+const currentRecordId = ref<number | null>(null);
 const result = ref<ResumeReviewResultDto | null>(null);
 const history = ref<ResumeReviewSummaryDto[]>([]);
 const currentHistoryId = ref<number | null>(null);
@@ -177,7 +196,7 @@ function formatTime(t?: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-async function handleReview() {
+async function handleAnalyze() {
   const text = resumeText.value.trim();
   if (!text) {
     ElMessage.warning('请先粘贴简历内容');
@@ -185,19 +204,36 @@ async function handleReview() {
   }
   loading.value = true;
   result.value = null;
+  currentRecordId.value = null;
   currentHistoryId.value = null;
   try {
-    const res = await reviewResume({
+    const res = await analyzeResume({
       resumeText: text,
       targetPosition: targetPosition.value.trim() || undefined,
     });
-    result.value = res.data;
-    ElMessage.success(`评分完成：${res.data.totalScore} 分`);
+    currentRecordId.value = res.data.id ?? null;
+    result.value = res.data.result;
+    ElMessage.success(`评分完成：${res.data.result.totalScore} 分`);
     await loadHistoryList();
   } catch {
     // 错误提示由 http 拦截器处理
   } finally {
     loading.value = false;
+  }
+}
+
+/** 第二步：生成优化版简历（2 分，需先完成分析） */
+async function handleOptimize() {
+  if (!currentRecordId.value) return;
+  optimizing.value = true;
+  try {
+    const res = await optimizeResume(currentRecordId.value);
+    result.value = res.data;
+    ElMessage.success('优化版简历已生成');
+  } catch {
+    // 错误提示由 http 拦截器处理
+  } finally {
+    optimizing.value = false;
   }
 }
 
@@ -222,6 +258,7 @@ async function loadHistoryList() {
 
 async function loadHistory(id: number) {
   currentHistoryId.value = id;
+  currentRecordId.value = id;
   try {
     const res = await getResumeReview(id);
     result.value = res.data.result;
@@ -484,6 +521,14 @@ onMounted(() => {
   font-size: 13px;
   color: var(--app-text-secondary);
   line-height: 1.8;
+}
+
+/* 优化版简历待生成提示 */
+.resume-optimize-tip {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--app-text-secondary);
+  line-height: 1.7;
 }
 
 .resume-empty__icon {

@@ -36,7 +36,8 @@ public class ResumeReviewService {
 
     private static final Logger log = LoggerFactory.getLogger(ResumeReviewService.class);
 
-    private static final String SYSTEM_PROMPT_TEMPLATE =
+    /** 评分分析 prompt（只输出评分与点评，不含优化版简历，输出小响应快） */
+    private static final String ANALYZE_PROMPT =
             "你是一位资深技术面试官与简历优化专家，为计算机专业学生/求职者的简历评分。\n"
             + "参考以下简历写作规范（知识库检索结果，仅作参考，不要照抄）：\n{context}\n"
             + "评分维度固定为：\n"
@@ -47,8 +48,14 @@ public class ResumeReviewService {
             + "5. 岗位匹配度：与目标岗位的相关性\n"
             + "6. 综合素养：实习/竞赛/开源/证书等加分项\n"
             + "只输出一个合法 JSON，格式如下：\n"
-            + "{\"totalScore\":78,\"summary\":\"总体评价\",\"dimensions\":[{\"name\":\"项目经历\",\"score\":82,\"comment\":\"现状评价\",\"suggestion\":\"改进建议\"}],\"highlights\":[\"亮点1\"],\"weaknesses\":[\"不足1\"],\"improvedResume\":\"基于原文优化后的完整简历全文，保留原信息结构，补充量化表述\"}\n"
+            + "{\"totalScore\":78,\"summary\":\"总体评价\",\"dimensions\":[{\"name\":\"项目经历\",\"score\":82,\"comment\":\"现状评价\",\"suggestion\":\"改进建议\"}],\"highlights\":[\"亮点1\"],\"weaknesses\":[\"不足1\"]}\n"
             + "不要输出其他文字，不要用 ```json 包裹。";
+
+    /** 优化版简历 prompt（根据原文+评分结果，输出优化后的完整简历全文） */
+    private static final String OPTIMIZE_PROMPT =
+            "你是一位资深简历优化专家。请根据以下简历原文和已有评分意见，输出一份优化后的完整简历全文。\n"
+            + "要求：保留原信息结构（基本信息/教育背景/实习/项目/技能/荣誉），补充量化表述、修正表达问题、突出与目标岗位匹配的亮点。\n"
+            + "直接输出简历正文（纯文本，用换行分隔），不要输出任何解释、标题前缀或 Markdown 代码块。";
 
     private final ChatModel chatModel;
     private final HybridRetriever hybridRetriever;
@@ -79,22 +86,123 @@ public class ResumeReviewService {
      * @param req      简历内容 + 目标岗位
      * @return 评分结果
      */
-    public ResumeReviewResult review(Long userId, String username, ResumeReviewRequest req) {
+    public Map<String, Object> analyze(Long userId, String username, ResumeReviewRequest req) {
         String resumeText = filter(req.getResumeText() == null ? "" : req.getResumeText());
         if (resumeText == null || resumeText.isBlank()) {
             throw new BusinessException("简历内容不能为空");
         }
         String targetPosition = req.getTargetPosition() != null ? req.getTargetPosition().trim() : "";
 
-        // 积分预检：余额 ≥1 分才放行（VIP/ADMIN 不检），防 0 分用户刷评分
-        pointService.precheckFeature(username, "AI 简历评分");
+        // 计费预扣：分析 1 分（余额不足拦截，后续失败退回）
+        pointService.consumeForChat(username, 1, "AI 简历分析");
 
-        // 1. 检索知识库中的简历写作规范作为评分依据（失败降级跳过，不阻塞评分）
-        String context = "";
+        String context = retrieveContext();
+
+        // 2. 调用模型生成结构化评分（不含优化版，输出小响应快）
+        String systemPrompt = ANALYZE_PROMPT.replace("{context}", context.isBlank() ? "（无参考规范）" : context);
+        String userText = (targetPosition.isBlank() ? "目标岗位：未指定" : "目标岗位：" + targetPosition)
+                + "\n简历内容：\n" + resumeText;
+        String raw;
+        try {
+            org.springframework.ai.chat.model.ChatResponse response =
+                    chatModel.call(new Prompt(List.of(new SystemMessage(systemPrompt), new UserMessage(userText))));
+            raw = extractReplyText(response);
+        } catch (Exception e) {
+            pointService.addPoints(userId, 1, "简历分析失败退回");
+            log.error("简历评分调用模型失败", e);
+            throw new BusinessException("评分服务暂时不可用，请稍后重试");
+        }
+        if (raw == null || raw.isBlank()) {
+            pointService.addPoints(userId, 1, "简历分析失败退回");
+            throw new BusinessException("评分失败，请重试");
+        }
+
+        // 3. 解析 + 敏感词过滤
+        ResumeReviewResult result = sanitize(parseResult(raw));
+        if (result.getTotalScore() == null) {
+            result.setTotalScore(0);
+        }
+
+        // 4. 落库（优化版简历由 optimize 阶段再生成）
+        Long recordId;
+        try {
+            ResumeReview record = ResumeReview.builder()
+                    .userId(userId)
+                    .targetPosition(targetPosition)
+                    .resumeText(resumeText)
+                    .totalScore(result.getTotalScore())
+                    .detailJson(objectMapper.writeValueAsString(result))
+                    .createTime(LocalDateTime.now())
+                    .build();
+            resumeReviewMapper.insert(record);
+            recordId = record.getId();
+        } catch (Exception e) {
+            log.warn("简历评分记录保存失败: {}", e.getMessage());
+            recordId = null;
+        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", recordId);
+        data.put("result", result);
+        return data;
+    }
+
+    /**
+     * 生成优化版简历（第二步，2 分）：根据已保存的评分记录 + 简历原文，LLM 输出优化后的完整简历。
+     * 已生成过直接返回（幂等，不重复扣分）。
+     */
+    public ResumeReviewResult optimize(Long userId, String username, Long recordId) {
+        ResumeReview record = findOwned(userId, recordId);
+        if (record == null) throw new BusinessException(404, "记录不存在");
+        ResumeReviewResult result;
+        try {
+            result = objectMapper.readValue(record.getDetailJson(), ResumeReviewResult.class);
+        } catch (Exception e) {
+            throw new BusinessException("记录数据异常");
+        }
+        // 幂等：已生成优化版，直接返回不重复扣分
+        if (result.getImprovedResume() != null && !result.getImprovedResume().isBlank()) {
+            return result;
+        }
+        // 计费预扣：优化 2 分（失败退回）
+        pointService.consumeForChat(username, 2, "AI 简历优化");
+
+        String userText = "目标岗位：" + (record.getTargetPosition() == null || record.getTargetPosition().isBlank() ? "未指定" : record.getTargetPosition())
+                + "\n简历原文：\n" + record.getResumeText()
+                + "\n已有评分意见：" + (result.getSummary() == null ? "" : result.getSummary())
+                + (result.getWeaknesses() != null && !result.getWeaknesses().isEmpty() ? "；主要不足：" + String.join("；", result.getWeaknesses()) : "");
+        String raw;
+        try {
+            org.springframework.ai.chat.model.ChatResponse response =
+                    chatModel.call(new Prompt(List.of(new SystemMessage(OPTIMIZE_PROMPT), new UserMessage(userText)),
+                            ChatOptions.builder().model("qwen-plus").maxTokens(8192).build()));
+            raw = extractReplyText(response);
+        } catch (Exception e) {
+            pointService.addPoints(userId, 2, "简历优化失败退回");
+            log.error("简历优化调用模型失败", e);
+            throw new BusinessException("优化服务暂时不可用，请稍后重试");
+        }
+        if (raw == null || raw.isBlank()) {
+            pointService.addPoints(userId, 2, "简历优化失败退回");
+            throw new BusinessException("优化失败，请重试");
+        }
+        result.setImprovedResume(filter(raw));
+        try {
+            ResumeReview update = new ResumeReview();
+            update.setId(recordId);
+            update.setDetailJson(objectMapper.writeValueAsString(result));
+            resumeReviewMapper.updateById(update);
+        } catch (Exception e) {
+            log.warn("简历优化结果保存失败: {}", e.getMessage());
+        }
+        return result;
+    }
+
+    /** RAG 检索简历写作规范（失败降级返回空，不阻塞评分） */
+    private String retrieveContext() {
         try {
             List<Document> docs = hybridRetriever.retrieve("简历撰写优化建议 项目经历量化 技能表达", 5);
             if (docs != null && !docs.isEmpty()) {
-                context = docs.stream()
+                return docs.stream()
                         .map(Document::getText)
                         .filter(t -> t != null && !t.isBlank())
                         .reduce((a, b) -> a + "\n" + b)
@@ -103,62 +211,30 @@ public class ResumeReviewService {
         } catch (Exception e) {
             log.warn("简历评分检索知识库失败，降级为无上下文评分: {}", e.getMessage());
         }
+        return "";
+    }
 
-        // 2. 调用模型生成结构化评分
-        String systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace("{context}", context.isBlank() ? "（无参考规范）" : context);
-        String userText = (targetPosition.isBlank() ? "目标岗位：未指定" : "目标岗位：" + targetPosition)
-                + "\n简历内容：\n" + resumeText;
-        String raw;
+    /** JSON 解析（兼容 ```json 包裹；截断时截取到最后一个 } 保住评分维度） */
+    private ResumeReviewResult parseResult(String raw) {
+        String json = extractJson(raw);
         try {
-            // maxTokens 8192：长简历要输出「优化版完整简历」，默认 2048 会被截断导致 JSON 不完整
-            org.springframework.ai.chat.model.ChatResponse response =
-                    chatModel.call(new Prompt(List.of(new SystemMessage(systemPrompt), new UserMessage(userText)),
-                            ChatOptions.builder().model("qwen-plus").maxTokens(8192).build()));
-            raw = extractReplyText(response);
-            // 按实际 token 结算（usage 缺失按输出长度估算防白嫖），失败不影响主流程
-            try {
-                Integer usage = response != null && response.getMetadata() != null
-                        && response.getMetadata().getUsage() != null
-                        ? response.getMetadata().getUsage().getTotalTokens() : null;
-                int tokens = (usage != null && usage > 0) ? usage : (raw == null ? 0 : raw.length() / 2);
-                pointService.settleFeature(username, "AI 简历评分", "qwen-plus", tokens);
-            } catch (Exception ex) {
-                log.warn("简历评分结算失败: {}", ex.getMessage());
-            }
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("简历评分调用模型失败", e);
-            throw new BusinessException("评分服务暂时不可用，请稍后重试");
-        }
-        if (raw == null || raw.isBlank()) {
-            throw new BusinessException("评分失败，请重试");
-        }
-
-        // 3. 解析 JSON（兼容 ```json 包裹；超长输出被截断时截取到最后一个 } 保住评分维度）
-        ResumeReviewResult result;
-        try {
-            String json = extractJson(raw);
-            result = objectMapper.readValue(json, ResumeReviewResult.class);
+            return objectMapper.readValue(json, ResumeReviewResult.class);
         } catch (Exception e) {
             try {
-                String json = extractJson(raw);
                 int lastBrace = json.lastIndexOf('}');
                 if (lastBrace > 0) {
-                    result = objectMapper.readValue(json.substring(0, lastBrace + 1), ResumeReviewResult.class);
-                } else {
-                    throw e;
+                    return objectMapper.readValue(json.substring(0, lastBrace + 1), ResumeReviewResult.class);
                 }
-            } catch (Exception e2) {
-                log.warn("简历评分 JSON 解析失败: {}", raw);
-                throw new BusinessException("评分结果解析失败，请重试");
+            } catch (Exception ignored) {
             }
+            log.warn("简历评分 JSON 解析失败: {}", raw);
+            throw new BusinessException("评分结果解析失败，请重试");
         }
-        if (result.getTotalScore() == null) {
-            result.setTotalScore(0);
-        }
+    }
+
+    /** 结果字段敏感词过滤 */
+    private ResumeReviewResult sanitize(ResumeReviewResult result) {
         result.setSummary(filter(result.getSummary()));
-        result.setImprovedResume(filter(result.getImprovedResume()));
         if (result.getDimensions() != null) {
             for (ResumeDimension d : result.getDimensions()) {
                 d.setName(filter(d.getName()));
@@ -171,21 +247,6 @@ public class ResumeReviewService {
         }
         if (result.getWeaknesses() != null) {
             result.setWeaknesses(result.getWeaknesses().stream().map(this::filter).toList());
-        }
-
-        // 4. 落库
-        try {
-            ResumeReview record = ResumeReview.builder()
-                    .userId(userId)
-                    .targetPosition(targetPosition)
-                    .resumeText(resumeText)
-                    .totalScore(result.getTotalScore())
-                    .detailJson(objectMapper.writeValueAsString(result))
-                    .createTime(LocalDateTime.now())
-                    .build();
-            resumeReviewMapper.insert(record);
-        } catch (Exception e) {
-            log.warn("简历评分记录保存失败: {}", e.getMessage());
         }
         return result;
     }

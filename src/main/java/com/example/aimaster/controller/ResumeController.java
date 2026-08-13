@@ -49,13 +49,22 @@ public class ResumeController {
         return user != null ? user.getId() : null;
     }
 
-    /** POST /api/resume/review 评分并保存（带积分预检/结算，防爆刷 LLM） */
-    @PostMapping("/review")
-    public Result<ResumeReviewResult> review(@Valid @RequestBody ResumeReviewRequest req) {
+    /** POST /api/resume/analyze 评分分析（1 分）：6 维度评分 + 亮点/不足，不含优化版（响应快） */
+    @PostMapping("/analyze")
+    public Result<Map<String, Object>> analyze(@Valid @RequestBody ResumeReviewRequest req) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         Long userId = currentUserId();
         if (userId == null) return Result.fail(401, "未登录或账号不存在");
-        return Result.ok(resumeReviewService.review(userId, auth.getName(), req));
+        return Result.ok(resumeReviewService.analyze(userId, auth.getName(), req));
+    }
+
+    /** POST /api/resume/optimize/{id} 生成优化版简历（2 分，需先完成分析） */
+    @PostMapping("/optimize/{id}")
+    public Result<ResumeReviewResult> optimize(@PathVariable Long id) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Long userId = currentUserId();
+        if (userId == null) return Result.fail(401, "未登录或账号不存在");
+        return Result.ok(resumeReviewService.optimize(userId, auth.getName(), id));
     }
 
     /** GET /api/resume/reviews 历史概要列表 */

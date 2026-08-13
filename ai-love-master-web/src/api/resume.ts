@@ -35,10 +35,17 @@ export interface ResumeReviewDetailDto {
   result: ResumeReviewResultDto;
 }
 
-/** POST /api/resume/review 评分并保存（AI 评审耗时长，单独放宽超时到 90s，覆盖全局 20s 默认值） */
-export function reviewResume(payload: { resumeText: string; targetPosition?: string }) {
-  return http.post<any, ResultWrapper<ResumeReviewResultDto>>('/api/resume/review', payload, {
+/** POST /api/resume/analyze 评分分析（1 分）：6 维度评分 + 亮点/不足，不含优化版 */
+export function analyzeResume(payload: { resumeText: string; targetPosition?: string }) {
+  return http.post<any, ResultWrapper<{ id: number | null; result: ResumeReviewResultDto }>>('/api/resume/analyze', payload, {
     timeout: 90000,
+  });
+}
+
+/** POST /api/resume/optimize/{id} 生成优化版简历（2 分，需先完成分析） */
+export function optimizeResume(id: number) {
+  return http.post<any, ResultWrapper<ResumeReviewResultDto>>(`/api/resume/optimize/${id}`, undefined, {
+    timeout: 120000,
   });
 }
 
