@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -109,8 +110,10 @@ public class ResumeReviewService {
                 + "\n简历内容：\n" + resumeText;
         String raw;
         try {
+            // maxTokens 8192：长简历要输出「优化版完整简历」，默认 2048 会被截断导致 JSON 不完整
             org.springframework.ai.chat.model.ChatResponse response =
-                    chatModel.call(new Prompt(List.of(new SystemMessage(systemPrompt), new UserMessage(userText))));
+                    chatModel.call(new Prompt(List.of(new SystemMessage(systemPrompt), new UserMessage(userText)),
+                            ChatOptions.builder().model("qwen-plus").maxTokens(8192).build()));
             raw = extractReplyText(response);
             // 按实际 token 结算（usage 缺失按输出长度估算防白嫖），失败不影响主流程
             try {
@@ -132,14 +135,24 @@ public class ResumeReviewService {
             throw new BusinessException("评分失败，请重试");
         }
 
-        // 3. 解析 JSON（兼容 ```json 包裹）
+        // 3. 解析 JSON（兼容 ```json 包裹；超长输出被截断时截取到最后一个 } 保住评分维度）
         ResumeReviewResult result;
         try {
             String json = extractJson(raw);
             result = objectMapper.readValue(json, ResumeReviewResult.class);
         } catch (Exception e) {
-            log.warn("简历评分 JSON 解析失败: {}", raw);
-            throw new BusinessException("评分结果解析失败，请重试");
+            try {
+                String json = extractJson(raw);
+                int lastBrace = json.lastIndexOf('}');
+                if (lastBrace > 0) {
+                    result = objectMapper.readValue(json.substring(0, lastBrace + 1), ResumeReviewResult.class);
+                } else {
+                    throw e;
+                }
+            } catch (Exception e2) {
+                log.warn("简历评分 JSON 解析失败: {}", raw);
+                throw new BusinessException("评分结果解析失败，请重试");
+            }
         }
         if (result.getTotalScore() == null) {
             result.setTotalScore(0);

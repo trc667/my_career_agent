@@ -96,6 +96,11 @@
             <pre class="resume-improved">{{ result.improvedResume }}</pre>
           </div>
         </template>
+        <div v-else-if="loading" class="resume-loading">
+          <el-icon class="is-loading resume-loading__icon"><Loading /></el-icon>
+          <p class="resume-loading__title">AI 正在深度评审简历…</p>
+          <p class="resume-loading__desc">正在从 6 个维度分析并生成优化建议<br />长简历（3000+ 字）约需 1-2 分钟，请耐心等待</p>
+        </div>
         <div v-else class="resume-empty">
           <div class="resume-empty__icon">📄</div>
           <p>在左侧粘贴简历后点击「开始评分」，<br />AI 将从项目经历、量化成果、岗位匹配等维度给出评分与优化建议。</p>
@@ -136,6 +141,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { Loading } from '@element-plus/icons-vue';
 import { useLoveMasterStore } from '../store/loveMasterStore';
 import {
   reviewResume,
@@ -451,6 +457,33 @@ onMounted(() => {
   color: var(--app-text-secondary);
   font-size: 14px;
   line-height: 2;
+}
+
+/* AI 评审中的友好加载提示（长简历耗时长，避免用户干等） */
+.resume-loading {
+  text-align: center;
+  padding: 70px var(--app-space-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.resume-loading__icon {
+  font-size: 42px;
+  color: var(--app-primary);
+}
+
+.resume-loading__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--app-text);
+}
+
+.resume-loading__desc {
+  font-size: 13px;
+  color: var(--app-text-secondary);
+  line-height: 1.8;
 }
 
 .resume-empty__icon {
