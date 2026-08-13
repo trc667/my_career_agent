@@ -63,7 +63,7 @@
 24. **八股随机题改疑问句**：八股练习场「随机一题」抽题后经 LLM 改写为可直接作答的面试问句（失败降级原文）；弹窗题目高亮展示 + 「查看参考答案」折叠原文知识点；错题本存改写后的题目、AI 讲解结合题目+原文（`BaguService.randomQuestion/toQuestion`/`GET /api/bagu/random` 返回 question+content/`BaguView` 随机弹窗）
 25. **八股题库扩充（小林 coding 风格）**：新增 36 条后端八股知识点（网络/OS/MySQL/Redis/Java/Spring 六大主题，行业公共知识自行组织语言，参考小林coding/JavaGuide 知识体系），知识库 629 → 665 段（`scripts/insert-bagu-knowledge.sql` 批量导入 knowledge 表 + rebuild 全量重建）
 26. **AI 功能积分计费全覆盖（防爆刷 LLM）**：简历评分、职规报告补上积分校验（此前可被 0 分用户无限免费调用 LLM）；八股 AI 讲解因复用聊天接口（chatWithRag）天然继承预检+按 token 结算；PointService 抽公共逻辑新增 `precheckFeature`/`settleFeature`（场景化流水原因，如「AI 简历评分:qwen-plus」）；ResumeReviewService.review 加 username 参数（Controller 从 JWT 传）、generateReport 预检/结算（`PointService.precheckBalance/settleBalance`/`ResumeController`/`CareerMasterServiceImpl.generateReport`）
-27. **新手引导任务（漏斗缺口修复）**：4 个新手任务（首次对话 +10/首次签到 +5/首次面试 +15/首次兑换 +10，共 40 分），完成状态从业务表实时判定（conversation/sign_in/interview_record/redeem_record），领取记录落 user_task 表（唯一约束幂等防刷）；个人中心「🎯 新手任务」卡片（领取按钮/已领取/未完成三态）+ 首页快捷入口（`GuideTaskService`/`GET /api/user/tasks`+`POST /api/user/tasks/{key}/claim`/`UserTask` 实体/`UserCenterView` 任务卡片/`HomePage` 快捷入口）
+27. **新手引导任务（漏斗缺口修复）**：4 个新手任务（首次对话 +10/首次签到 +5/首次面试 +15/首次兑换 +10，共 40 分），完成状态从业务表实时判定（conversation/sign_in/interview_record/redeem_record），领取记录落 user_task 表（唯一约束幂等防刷）；个人中心「🎯 新手任务」卡片（领取按钮/已领取/未完成三态）+ 首页醒目引导——**首页主视觉区「🎯 新手任务 x/4」橙色进度条**（可点击展开内联领取，全部领取后自动隐藏）+ 顶栏积分徽章可领取红点（`GuideTaskService`/`GET /api/user/tasks`+`POST /api/user/tasks/{key}/claim`/`UserTask` 实体/`UserCenterView` 任务卡片/`HomePage` 进度条+红点）
 28. **一键启动脚本**：`scripts/start-all.ps1` 一条命令拉起后端（JDK17）+前端（Vite）+cpolar 双隧道，跳过已运行服务（幂等），等待后端健康后自动打印本地地址与新隧道域名（日志正则提取，双隧道都出现才输出）；冷启动实测通过
 
 ## 四、本轮任务进度（已完成并验证）

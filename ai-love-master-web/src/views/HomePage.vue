@@ -13,7 +13,7 @@
             <span class="home__user-trigger">
               <el-avatar :size="26" class="home__user-avatar" :src="authStore.avatar || undefined">{{ authStore.avatar ? '' : (authStore.username || '我')[0] }}</el-avatar>
               <span class="home__user-name">{{ authStore.username }}</span>
-              <span v-if="points > 0 || level === 'VIP'" class="home__points-badge" title="点击查看积分明细">⚡ {{ points }}</span>
+              <span v-if="points > 0 || level === 'VIP'" class="home__points-badge" title="点击查看积分明细">⚡ {{ points }}<i v-if="taskClaimableCount > 0" class="home__points-dot"></i></span>
               <el-tag v-if="level === 'VIP'" type="warning" size="small" effect="dark" class="home__vip-tag">VIP</el-tag>
               <el-icon class="home__user-caret"><ArrowDown /></el-icon>
             </span>
@@ -127,6 +127,41 @@
           签到周期 <b class="app-num">{{ streakInCycle }}/7</b> 天 · 再签 <b class="app-num">{{ remainToBonus }}</b> 天解锁 +10
         </span>
         <el-progress :percentage="streakPct" :stroke-width="6" :show-text="false" color="#2f6bff" class="home__streak-bar" />
+      </div>
+
+      <!-- 新手任务进度条（登录且还有未领取任务时显示，点击展开内联领取） -->
+      <div
+        v-if="authStore.isAuthenticated() && guideTasks.length && hasPendingTask"
+        class="home__taskbar"
+        :class="{ 'is-open': tasksExpanded }"
+      >
+        <div class="home__taskbar-head" @click="tasksExpanded = !tasksExpanded">
+          <span class="home__taskbar-title">🎯 新手任务</span>
+          <el-progress :percentage="taskProgressPct" :stroke-width="6" :show-text="false" color="#ff9800" class="home__taskbar-bar" />
+          <span class="home__taskbar-text app-num">{{ taskDoneCount }}/{{ guideTasks.length }}</span>
+          <span v-if="taskClaimableCount > 0" class="home__taskbar-badge">+{{ taskClaimableReward }} 可领取</span>
+          <span v-else class="home__taskbar-text">进行中</span>
+          <span class="home__taskbar-caret">{{ tasksExpanded ? '▴' : '▾' }}</span>
+        </div>
+        <div v-if="tasksExpanded" class="home__taskbar-list">
+          <div v-for="t in guideTasks" :key="t.key" class="home__taskbar-item">
+            <span class="home__taskbar-icon">{{ taskIcon(t.key) }}</span>
+            <div class="home__taskbar-info">
+              <span class="home__taskbar-name">{{ t.name }} <em>+{{ t.rewardPoints }}</em></span>
+              <span class="home__taskbar-desc">{{ t.desc }}</span>
+            </div>
+            <el-button
+              v-if="t.canClaim"
+              type="primary"
+              size="small"
+              round
+              :loading="claimingKey === t.key"
+              @click.stop="handleClaimHomeTask(t)"
+            >领取</el-button>
+            <el-tag v-else-if="t.claimed" size="small" type="success" effect="plain">已领取</el-tag>
+            <el-tag v-else size="small" type="info" effect="plain">{{ t.done ? '可领取' : '未完成' }}</el-tag>
+          </div>
+        </div>
       </div>
 
       <!-- 多引擎搜索框 -->
@@ -396,7 +431,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { ArrowDown } from '@element-plus/icons-vue';
 import PixelIcon from '../components/PixelIcon.vue';
 import DashboardPanel from '../components/DashboardPanel.vue';
@@ -404,7 +439,7 @@ import WeatherPanel from '../components/WeatherPanel.vue';
 import MarqueeBar from '../components/MarqueeBar.vue';
 import { useAuthStore } from '../store/authStore';
 import { getLatestNotice, type Notice } from '../api/notice';
-import { getAchievements, getInvite, getPoints, getWeeklyReport, signIn, type WeeklyReport } from '../api/user';
+import { claimGuideTask, getAchievements, getGuideTasks, getInvite, getPoints, getWeeklyReport, signIn, type GuideTask, type WeeklyReport } from '../api/user';
 import { useCountUp } from '../composables/useCountUp';
 
 const router = useRouter();
@@ -490,6 +525,55 @@ async function loadWeekly() {
     weekly.value = res.data ?? null;
   } catch {
     // 拦截器已提示
+  }
+}
+
+/* ===== 新手引导任务（首页进度条 + 内联领取） ===== */
+const guideTasks = ref<GuideTask[]>([]);
+const tasksExpanded = ref(false);
+const claimingKey = ref('');
+
+const taskDoneCount = computed(() => guideTasks.value.filter((t) => t.done).length);
+const taskClaimableCount = computed(() => guideTasks.value.filter((t) => t.canClaim).length);
+const taskClaimableReward = computed(() =>
+  guideTasks.value.filter((t) => t.canClaim).reduce((s, t) => s + t.rewardPoints, 0),
+);
+const taskProgressPct = computed(() =>
+  guideTasks.value.length ? Math.round((taskDoneCount.value / guideTasks.value.length) * 100) : 0,
+);
+/** 是否还有未领取的任务（全部领取后隐藏进度条，老用户零打扰） */
+const hasPendingTask = computed(() => guideTasks.value.some((t) => !t.claimed));
+
+function taskIcon(key: string) {
+  const map: Record<string, string> = {
+    first_chat: '💬',
+    first_sign: '📅',
+    first_interview: '🎯',
+    first_redeem: '🛍️',
+  };
+  return map[key] ?? '✅';
+}
+
+async function loadGuideTasks() {
+  if (!authStore.isAuthenticated()) return;
+  try {
+    const res = await getGuideTasks();
+    guideTasks.value = res.data ?? [];
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+async function handleClaimHomeTask(t: GuideTask) {
+  claimingKey.value = t.key;
+  try {
+    const res = await claimGuideTask(t.key);
+    ElMessage.success(`奖励 +${res.data ?? t.rewardPoints} 积分已到账`);
+    await Promise.all([loadGuideTasks(), loadPoints()]);
+  } catch {
+    // 拦截器已提示
+  } finally {
+    claimingKey.value = '';
   }
 }
 
@@ -738,6 +822,7 @@ onMounted(() => {
     loadInviteCount();
     loadAchievements();
     loadWeekly();
+    loadGuideTasks();
   }
 });
 onBeforeUnmount(() => {
@@ -858,6 +943,121 @@ function dotStyle(n: number) {
   min-width: 140px;
 }
 
+/* ===== 新手任务进度条（首页醒目引导，全部领取后自动隐藏） ===== */
+.home__taskbar {
+  max-width: 720px;
+  margin: 14px auto 0;
+  background: linear-gradient(135deg, #fff7ec 0%, #fffdf8 100%);
+  border: 1px solid #ffe3bd;
+  border-radius: 14px;
+  box-shadow: var(--app-shadow-sm);
+  overflow: hidden;
+}
+
+.theme-dark .home__taskbar {
+  background: linear-gradient(135deg, #261f12 0%, #1a160d 100%);
+  border-color: #4a3a1e;
+}
+
+.home__taskbar-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.home__taskbar-head:hover {
+  background: rgba(255, 152, 0, 0.08);
+}
+
+.home__taskbar-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--app-text);
+  white-space: nowrap;
+}
+
+.home__taskbar-bar {
+  flex: 1;
+  min-width: 80px;
+}
+
+.home__taskbar-text {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+  white-space: nowrap;
+}
+
+.home__taskbar-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #ff9800, #ff7043);
+  border-radius: 9999px;
+  padding: 1px 9px;
+  white-space: nowrap;
+}
+
+.home__taskbar-caret {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+
+.home__taskbar-list {
+  border-top: 1px dashed rgba(47, 107, 255, 0.15);
+  padding: 6px 0;
+}
+
+.home__taskbar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  transition: background 0.15s ease;
+}
+
+.home__taskbar-item:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.theme-dark .home__taskbar-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.home__taskbar-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.home__taskbar-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.home__taskbar-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--app-text);
+}
+
+.home__taskbar-name em {
+  font-style: normal;
+  color: #ff9800;
+  font-weight: 700;
+}
+
+.home__taskbar-desc {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+  line-height: 1.4;
+}
+
 /* ===== 顶部导航 ===== */
 .home__nav {
   position: relative;
@@ -938,6 +1138,18 @@ function dotStyle(n: number) {
 
 .home__points-badge:hover {
   background: rgba(230, 162, 60, 0.2);
+}
+
+/* 顶栏积分徽章上的任务可领取红点提示 */
+.home__points-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: #f56c6c;
+  vertical-align: super;
+  box-shadow: 0 0 0 2px rgba(245, 108, 108, 0.25);
 }
 
 .home__vip-tag {
