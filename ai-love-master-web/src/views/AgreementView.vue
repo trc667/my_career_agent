@@ -104,7 +104,7 @@
         <h3>7. 政策变更与联系我们</h3>
         <p>
           本政策如有更新将在本页面公示。如您对本政策或数据使用有任何疑问，可通过「意见反馈」页面或发送邮件至
-          <a href="mailto:support@career-master.example.com">support@career-master.example.com</a> 联系我们。
+          <a href="mailto:2770382967@qq.com">2770382967@qq.com</a> 联系我们。
         </p>
       </section>
 
