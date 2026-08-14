@@ -13,7 +13,8 @@
           :title="theme === 'dark' ? '切换到亮色' : '切换到暗色'"
           @click="toggleTheme"
         >
-          {{ theme === 'dark' ? '☀️' : '🌙' }}
+          <span class="home__theme-icon">{{ theme === 'dark' ? '☀️' : '🌙' }}</span>
+          <span class="home__theme-text">{{ theme === 'dark' ? '日间模式' : '夜间模式' }}</span>
         </button>
         <template v-if="authStore.isAuthenticated()">
           <el-dropdown trigger="click" @command="handleUserCommand">
@@ -920,25 +921,44 @@ function dotStyle(n: number) {
   gap: var(--app-space-md);
 }
 
-/* 明暗主题切换按钮 */
+/* 明暗主题切换按钮（图标 + 文字胶囊） */
 .home__theme-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 34px;
+  gap: 6px;
   height: 34px;
+  padding: 0 14px;
   border: 1px solid var(--app-border);
-  border-radius: 50%;
+  border-radius: 9999px;
   background: var(--app-card);
-  font-size: 16px;
+  font-size: 14px;
+  color: var(--app-text);
   cursor: pointer;
   transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.home__theme-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.home__theme-text {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .home__theme-btn:hover {
   border-color: var(--app-accent-blue);
   transform: translateY(-1px);
   box-shadow: var(--app-shadow-sm);
+}
+
+@media (max-width: 767px) {
+  .home__theme-btn {
+    padding: 0 10px;
+    gap: 4px;
+  }
 }
 
 .home__user-trigger {

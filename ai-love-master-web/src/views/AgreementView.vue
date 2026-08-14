@@ -152,13 +152,23 @@ onMounted(() => {
 }
 
 .agreement-page__back {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
   font-size: 14px;
-  color: var(--app-accent-blue);
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #2f6bff, #17c3f8);
+  border-radius: 9999px;
   text-decoration: none;
+  box-shadow: 0 4px 14px rgba(47, 107, 255, 0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .agreement-page__back:hover {
-  text-decoration: underline;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(47, 107, 255, 0.42);
+  text-decoration: none;
 }
 
 .agreement-card {
