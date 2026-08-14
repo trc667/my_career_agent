@@ -14,6 +14,17 @@ function getAuthHeader(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/** 解析后端错误响应体：JSON 提取 message/msg，纯文本原样返回 */
+function parseErrorMessage(text: string): string {
+  try {
+    const j = JSON.parse(text) as Record<string, unknown>;
+    const msg = (j.message ?? j.msg ?? '') as string;
+    return msg || text;
+  } catch {
+    return text;
+  }
+}
+
 /** 页面 1：RAG 流式对话 */
 export async function postChatStream(
   body: { message: string; conversationId: string; model?: string },
@@ -34,8 +45,9 @@ export async function postChatStream(
 
   if (!res.ok) {
     const errText = await res.text();
-    onError?.(errText || `HTTP ${res.status}`);
-    throw new Error(errText || `HTTP ${res.status}`);
+    const msg = parseErrorMessage(errText) || `HTTP ${res.status}`;
+    onError?.(msg);
+    throw new Error(msg);
   }
 
   const reader = res.body?.getReader();
@@ -129,8 +141,9 @@ export async function postChatReactStream(
 
   if (!res.ok) {
     const errText = await res.text();
-    onError?.(errText || `HTTP ${res.status}`);
-    throw new Error(errText || `HTTP ${res.status}`);
+    const msg = parseErrorMessage(errText) || `HTTP ${res.status}`;
+    onError?.(msg);
+    throw new Error(msg);
   }
 
   const reader = res.body?.getReader();

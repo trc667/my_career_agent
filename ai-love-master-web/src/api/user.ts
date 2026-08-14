@@ -102,7 +102,7 @@ export interface WeeklyReport {
   week: string;
   conversation: { count: number; topics: string[] };
   learning: { signDays: number; checkinDays: number; newWrong: number; masteredWrong: number };
-  output: { resumeReviews: number };
+  output: { resumeReviews: number; interviews: number };
   points: { earned: number; spent: number; net: number; redeemCount: number };
   achievements: { unlocked: number; total: number };
   advice: string;

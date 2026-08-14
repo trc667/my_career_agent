@@ -24,6 +24,7 @@ backups/
 ai-love-master-web/node_modules/
 ai-love-master-web/.vite/
 ai-love-master-web/dist/
+ai-love-master-web/.npm-cache/
 
 # Logs
 *.log

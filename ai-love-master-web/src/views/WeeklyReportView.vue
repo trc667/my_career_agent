@@ -4,6 +4,9 @@
       <router-link to="/user-center" class="wr-page__back">← 返回个人中心</router-link>
       <h1 class="wr-page__title">学习周报</h1>
       <span v-if="report.week" class="wr-page__week">{{ report.week }}</span>
+      <el-button v-if="loaded" type="primary" round size="small" class="wr-page__share" @click="showShareCard = true">
+        📸 生成分享卡
+      </el-button>
     </div>
 
     <div v-if="!loaded" class="wr-skeleton">
@@ -77,17 +80,26 @@
       <span class="app-orb app-orb--purple wr-orb wr-orb--2" />
     </div>
   </div>
+
+  <ShareCardDialog
+    v-model="showShareCard"
+    title="我的学习周报"
+    :subtitle="report.week || '本周学习成果'"
+    :items="shareItems"
+    slogan="越努力，越幸运 · 下一周继续加油"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { getWeeklyReport, type WeeklyReport } from '../api/user';
+import ShareCardDialog from '../components/ShareCardDialog.vue';
 
 const report = ref<WeeklyReport>({
   week: '',
   conversation: { count: 0, topics: [] },
   learning: { signDays: 0, checkinDays: 0, newWrong: 0, masteredWrong: 0 },
-  output: { resumeReviews: 0 },
+  output: { resumeReviews: 0, interviews: 0 },
   points: { earned: 0, spent: 0, net: 0, redeemCount: 0 },
   achievements: { unlocked: 0, total: 0 },
   advice: '',
@@ -98,6 +110,18 @@ const netClass = computed(() => {
   const net = report.value.points?.net ?? 0;
   return net > 0 ? 'is-plus' : net < 0 ? 'is-minus' : '';
 });
+
+const showShareCard = ref(false);
+
+/** 分享卡数据（与页面数据卡片对应，社交传播获客） */
+const shareItems = computed(() => [
+  { label: 'AI 对话', value: `${report.value.conversation?.count ?? 0} 次` },
+  { label: '学习签到', value: `${report.value.learning?.signDays ?? 0} 天` },
+  { label: '简历评分', value: `${report.value.output?.resumeReviews ?? 0} 次` },
+  { label: '面试模拟', value: `${report.value.output?.interviews ?? 0} 场` },
+  { label: '积分净变', value: `${(report.value.points?.net ?? 0) > 0 ? '+' : ''}${report.value.points?.net ?? 0}` },
+  { label: '成就解锁', value: `${report.value.achievements?.unlocked ?? 0}/${report.value.achievements?.total ?? 0}` },
+]);
 
 onMounted(async () => {
   try {

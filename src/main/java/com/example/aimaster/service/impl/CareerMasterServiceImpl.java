@@ -4,9 +4,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletionException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import com.example.aimaster.config.ModelCatalog;
 import com.example.aimaster.dto.ChatResponse;
@@ -57,11 +63,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 
 import reactor.core.publisher.Flux;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 计算机学生职规大师智能体服务实现（业务层）。
@@ -105,6 +109,13 @@ public class CareerMasterServiceImpl implements CareerMasterService {
     private final int reactStepTimeoutMs;
     private final boolean hydeEnabled;
     private final int hydeLengthThreshold;
+
+    /** ReAct 工具/模型调用的专用线程池：避免阻塞公共 ForkJoinPool，超时后可真正中断。 */
+    private final ExecutorService callExecutor = Executors.newFixedThreadPool(4, r -> {
+        Thread t = new Thread(r, "react-call-worker");
+        t.setDaemon(true);
+        return t;
+    });
 
     public CareerMasterServiceImpl(
             ChatModel chatModel,
@@ -198,6 +209,11 @@ public class CareerMasterServiceImpl implements CareerMasterService {
         return msgList;
     }
 
+    @PreDestroy
+    public void shutdownExecutor() {
+        callExecutor.shutdownNow();
+    }
+
     @PostConstruct
     public void logToolCount() {
         ToolCallback[] all = getMergedToolCallbacks();
@@ -214,34 +230,6 @@ public class CareerMasterServiceImpl implements CareerMasterService {
                 }
             }
         }
-    }
-
-    @Override
-    public ChatResponse chat(String userMessage) {
-        String input = filterText(userMessage);
-        String hint = checkFilteredEmpty(userMessage, input);
-        if (hint != null) {
-            return ChatResponse.builder().reply(hint).build();
-        }
-        String sys = systemPrompt.replace("{context}", "");
-        Prompt prompt = new Prompt(List.of(
-                new SystemMessage(sys),
-                new UserMessage(input)
-        ));
-        org.springframework.ai.chat.model.ChatResponse response = chatModel.call(prompt);
-        String reply = filterText(extractReplyText(response));
-        Integer usage = response.getMetadata() != null && response.getMetadata().getUsage() != null
-                ? response.getMetadata().getUsage().getTotalTokens()
-                : null;
-        log.info("---------- 用户提问 ----------");
-        log.info("{}", userMessage);
-        log.info("---------- AI 职规大师 回复 ----------");
-        log.info("{}", reply);
-        if (usage != null) {
-            log.info("---------- 本次消耗 token: {} ----------", usage);
-        }
-        String safeReply = reply != null ? reply : "";
-        return ChatResponse.builder().reply(safeReply).usageTokens(usage).build();
     }
 
     @Override
@@ -933,31 +921,39 @@ public class CareerMasterServiceImpl implements CareerMasterService {
 
     private String safeCallTool(ToolCallback cb, String args, String name) {
         try {
-            Object r = java.util.concurrent.CompletableFuture
-                    .supplyAsync(() -> cb.call(args))
-                    .orTimeout(reactStepTimeoutMs, TimeUnit.MILLISECONDS)
-                    .join();
+            Object r = callWithTimeout(() -> cb.call(args), "工具 " + name);
             if (r == null) return "";
             if (r instanceof String s) return s;
             return objectMapper.writeValueAsString(r);
         } catch (Exception e) {
-            Throwable root = (e instanceof CompletionException && e.getCause() != null) ? e.getCause() : e;
-            log.warn("工具执行异常 {}: {}", name, root.getMessage());
-            return "工具执行异常: " + (root.getMessage() != null ? root.getMessage() : root.getClass().getSimpleName());
+            log.warn("工具执行异常 {}: {}", name, e.getMessage());
+            return "工具执行异常: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * 在专用线程池中执行阻塞调用并限时等待：超时/被中断时 cancel(true) 真正中断底层线程，
+     * 避免 CompletableFuture.supplyAsync + join 占用公共 ForkJoinPool 且超时后底层调用仍泄漏线程的问题。
+     */
+    private <T> T callWithTimeout(Callable<T> task, String what) {
+        Future<T> future = callExecutor.submit(task);
+        try {
+            return future.get(reactStepTimeoutMs, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            throw new RuntimeException(what + "超时（" + reactStepTimeoutMs + "ms）", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            future.cancel(true);
+            throw new RuntimeException(what + "被中断", e);
+        } catch (ExecutionException e) {
+            Throwable root = e.getCause() != null ? e.getCause() : e;
+            throw new RuntimeException(what + "执行失败: " + root.getMessage(), root);
         }
     }
 
     private org.springframework.ai.chat.model.ChatResponse callModelWithTimeout(Prompt prompt) {
-        try {
-            return java.util.concurrent.CompletableFuture
-                    .supplyAsync(() -> chatModel.call(prompt))
-                    .orTimeout(reactStepTimeoutMs, TimeUnit.MILLISECONDS)
-                    .join();
-        } catch (Exception e) {
-            Throwable root = (e instanceof CompletionException && e.getCause() != null) ? e.getCause() : e;
-            String msg = root.getMessage() != null ? root.getMessage() : root.getClass().getSimpleName();
-            throw new RuntimeException("模型调用超时或失败: " + msg, root);
-        }
+        return callWithTimeout(() -> chatModel.call(prompt), "模型调用");
     }
 
     private String toJson(Object obj) {

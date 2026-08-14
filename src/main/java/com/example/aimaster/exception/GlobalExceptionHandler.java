@@ -88,25 +88,22 @@ public class GlobalExceptionHandler {
         log.debug("客户端已断开连接: {}", e.getClass().getSimpleName());
     }
 
-    /** 其他未捕获异常：打日志 + 控制台输出堆栈，便于排查 */
+    /** 其他未捕获异常：异常详情只落日志与 error_log，不下发客户端（避免泄露内部类名/错误信息） */
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Result<?> handleOther(Exception e, HttpServletRequest request) {
         log.error("未捕获异常", e);
-        // 确保异常堆栈输出到控制台，方便本地排查
-        e.printStackTrace();
         // 自建监控：500 级错误自动入库（入库失败不影响响应）
         try {
             String uri = request != null ? request.getRequestURI() : "";
             String method = request != null ? request.getMethod() : "";
-            errorLogService.reportBackend(e.getMessage(), stackTraceOf(e), uri, method);
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            if (msg.length() > 500) msg = msg.substring(0, 497) + "...";
+            errorLogService.reportBackend(msg, stackTraceOf(e), uri, method);
         } catch (Exception ignored) {
             // 监控入库失败不阻塞主流程
         }
-        String msg = e.getMessage() != null ? e.getMessage() : "服务异常，请稍后重试";
-        if (msg.length() > 200) msg = msg.substring(0, 197) + "...";
-        String hint = e.getClass().getSimpleName() + ": " + msg;
-        return Result.fail(500, hint);
+        return Result.fail(500, "服务异常，请稍后重试");
     }
 
     /** 截取堆栈前若干行（防止超长入库） */

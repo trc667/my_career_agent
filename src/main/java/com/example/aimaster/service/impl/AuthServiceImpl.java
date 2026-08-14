@@ -54,6 +54,8 @@ public class AuthServiceImpl implements AuthService {
         loginAttemptService.checkLocked(req.getUsername());
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, req.getUsername()));
         if (user == null) {
+            // 用户不存在也记录失败，防止攻击者无代价枚举用户名绕过锁定
+            loginAttemptService.recordFailure(req.getUsername());
             throw new BusinessException("用户名或密码错误");
         }
         boolean matches = passwordEncoder.matches(req.getPassword(), user.getPasswordHash());
@@ -82,8 +84,11 @@ public class AuthServiceImpl implements AuthService {
         if (existingUser != null) {
             throw new BusinessException("用户名已存在");
         }
-        // 邮箱唯一性
-        String email = req.getEmail().trim().toLowerCase();
+        // 邮箱唯一性（防御：正常情况下 @Valid 已保证非空）
+        String email = req.getEmail() != null ? req.getEmail().trim().toLowerCase() : null;
+        if (email == null || email.isBlank()) {
+            throw new BusinessException("邮箱不能为空");
+        }
         User emailUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getEmail, email));
         if (emailUser != null) {
             throw new BusinessException("该邮箱已被注册");

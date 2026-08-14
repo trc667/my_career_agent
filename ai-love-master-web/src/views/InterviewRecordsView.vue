@@ -130,7 +130,7 @@ const trendPoints = computed(() => trendData.value.map((p) => `${p.x},${p.y}`).j
 const trendArea = computed(() => {
   const pts = trendData.value;
   if (!pts.length) return '';
-  return `${pts[0].x},150 ${pts.map((p) => `${p.x},${p.y}`).join(' ')} ${pts[pts.length - 1].x},150`;
+  return `${pts[0]!.x},150 ${pts.map((p) => `${p.x},${p.y}`).join(' ')} ${pts[pts.length - 1]!.x},150`;
 });
 
 onMounted(loadRecords);

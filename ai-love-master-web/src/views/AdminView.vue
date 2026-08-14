@@ -223,7 +223,7 @@
             <el-table-column prop="content" label="内容" min-width="260" show-overflow-tooltip />
             <el-table-column label="状态" width="80">
               <template #default="{ row }">
-                <el-switch :model-value="row.enabled === 1" size="small" @change="(v: boolean) => handleToggleKnowledge(row, v)" />
+                <el-switch :model-value="row.enabled === 1" size="small" @change="(v) => handleToggleKnowledge(row, Boolean(v))" />
               </template>
             </el-table-column>
             <el-table-column label="更新时间" min-width="150">

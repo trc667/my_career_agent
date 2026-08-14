@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { login as apiLogin, register as apiRegister } from '../api/auth';
 import { getUserMe } from '../api/user';
 import { useLoveMasterStore } from './loveMasterStore';
+import { useSuperAgentStore } from './superAgentStore';
 import type { LoginRequest, RegisterRequest } from '../api/auth';
 
 const TOKEN_KEY = 'love_master_token';
@@ -93,6 +94,7 @@ export const useAuthStore = defineStore('auth', () => {
     clearAuth();
     // 清空聊天会话，防止换账号串数据
     useLoveMasterStore().reset();
+    useSuperAgentStore().reset();
   }
 
   return {

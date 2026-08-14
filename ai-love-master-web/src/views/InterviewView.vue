@@ -25,8 +25,8 @@
         </button>
       </div>
       <div class="iv-select__actions">
-        <el-button v-if="!quota.vip && quota.quotaLeft <= 0" type="primary" disabled size="large" round>
-          今日次数已用完，开通 VIP 不限次
+        <el-button v-if="!quota.vip && quota.quotaLeft <= 0" type="warning" size="large" round class="shimmer-btn" @click="showVipBenefits = true">
+          今日次数已用完，开通 VIP 不限次 →
         </el-button>
         <el-button v-else type="primary" size="large" round :loading="starting" class="shimmer-btn" @click="handleStart">
           开始面试
@@ -91,7 +91,7 @@
           <span class="iv-report__score app-num">{{ report.totalScore }}</span>
         </div>
         <div v-if="report.dimensions?.length" class="iv-report__radar-wrap">
-          <canvas ref="radarCanvas" class="iv-report__radar"></canvas>
+          <div ref="radarEl" class="iv-report__radar"></div>
           <div class="iv-report__dims">
             <div v-for="d in report.dimensions" :key="d.name" class="iv-report__dim">
               <span class="iv-report__dim-name">{{ d.name }}</span>
@@ -118,11 +118,12 @@
       <span class="app-orb app-orb--purple iv-orb iv-orb--2" />
     </div>
   </div>
+
+  <VipBenefitsDialog v-model="showVipBenefits" />
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { ElMessage } from 'element-plus';
 import {
   answerInterview,
   getInterviewQuota,
@@ -132,6 +133,13 @@ import {
   type InterviewReport,
   type InterviewReview,
 } from '../api/interview';
+import VipBenefitsDialog from '../components/VipBenefitsDialog.vue';
+import * as echarts from 'echarts/core';
+import { RadarChart } from 'echarts/charts';
+import { TooltipComponent } from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
+
+echarts.use([RadarChart, TooltipComponent, CanvasRenderer]);
 
 const positions = [
   { name: '后端', icon: '🖥️', desc: 'Java/Spring/数据库/分布式' },
@@ -148,6 +156,7 @@ const quota = ref<InterviewQuota>({ vip: false, dailyLimit: 2, quotaLeft: 2 });
 
 const starting = ref(false);
 const reviewing = ref(false);
+const showVipBenefits = ref(false);
 const sessionId = ref('');
 const question = ref('');
 const index = ref(0);
@@ -161,105 +170,81 @@ const report = ref<InterviewReport>({ position: '', totalScore: 0, dimensions: [
 const pct = computed(() => Math.round((index.value / total.value) * 100));
 
 /* ===== 报告雷达图（轻量 canvas 自绘，不引 ECharts） ===== */
-const radarCanvas = ref<HTMLCanvasElement | null>(null);
-let radarObserver: ResizeObserver | null = null;
+const radarEl = ref<HTMLDivElement | null>(null);
+let radarChart: ReturnType<typeof echarts.init> | null = null;
 
 watch(stage, (s) => {
-  if (s === 'report') nextTick(drawRadar);
+  if (s === 'report') {
+    nextTick(drawRadar);
+  } else {
+    // 离开报告页时销毁图表实例：v-if 会移除 DOM，保留实例会导致下次进入时
+    // init 判断跳过、setOption 作用在已脱离文档的旧元素上而白屏
+    radarChart?.dispose();
+    radarChart = null;
+  }
 });
+
+function handleResize() {
+  if (stage.value === 'report') drawRadar();
+}
 
 onMounted(() => {
   loadQuota();
-  radarObserver = new ResizeObserver(() => {
-    if (stage.value === 'report') drawRadar();
-  });
-  if (radarCanvas.value) radarObserver.observe(radarCanvas.value);
+  window.addEventListener('resize', handleResize);
 });
 
-onBeforeUnmount(() => radarObserver?.disconnect());
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize);
+  radarChart?.dispose();
+  radarChart = null;
+});
 
 function drawRadar() {
-  const canvas = radarCanvas.value;
+  const el = radarEl.value;
   const dims = report.value.dimensions;
-  if (!canvas || !dims?.length) return;
+  if (!el || !dims?.length) return;
+  if (!radarChart) {
+    radarChart = echarts.init(el);
+  }
   const css = getComputedStyle(document.documentElement);
   const primary = css.getPropertyValue('--app-primary').trim() || '#2f6bff';
   const textColor = css.getPropertyValue('--app-text-secondary').trim() || '#7a8699';
   const gridColor = css.getPropertyValue('--app-border').trim() || '#eef1f6';
-  const dpr = window.devicePixelRatio || 1;
-  const size = Math.min(canvas.clientWidth || 300, 340);
-  canvas.width = size * dpr;
-  canvas.height = size * dpr;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, size, size);
 
-  const cx = size / 2;
-  const cy = size / 2;
-  const R = size / 2 - 36;
-  const n = dims.length;
-  const angle = (i: number) => -Math.PI / 2 + (2 * Math.PI * i) / n;
-
-  // 网格：3 圈同心多边形
-  for (let g = 3; g >= 1; g--) {
-    ctx.beginPath();
-    for (let i = 0; i <= n; i++) {
-      const r = (R * g) / 3;
-      const x = cx + r * Math.cos(angle(i % n));
-      const y = cy + r * Math.sin(angle(i % n));
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = gridColor;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
-
-  // 轴线 + 维度标签
-  ctx.font = '12px sans-serif';
-  ctx.fillStyle = textColor;
-  ctx.textBaseline = 'middle';
-  for (let i = 0; i < n; i++) {
-    const a = angle(i);
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + R * Math.cos(a), cy + R * Math.sin(a));
-    ctx.strokeStyle = gridColor;
-    ctx.stroke();
-    const lx = cx + (R + 14) * Math.cos(a);
-    const ly = cy + (R + 14) * Math.sin(a);
-    ctx.textAlign = Math.cos(a) > 0.3 ? 'left' : Math.cos(a) < -0.3 ? 'right' : 'center';
-    ctx.fillText(dims[i].name, lx, ly);
-  }
-
-  // 数据多边形
-  ctx.beginPath();
-  for (let i = 0; i <= n; i++) {
-    const idx = i % n;
-    const score = Math.max(0, Math.min(100, dims[idx].score));
-    const r = (R * score) / 100;
-    const x = cx + r * Math.cos(angle(idx));
-    const y = cy + r * Math.sin(angle(idx));
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  }
-  ctx.closePath();
-  ctx.fillStyle = primary + '26';
-  ctx.fill();
-  ctx.strokeStyle = primary;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // 顶点圆点
-  for (let i = 0; i < n; i++) {
-    const score = Math.max(0, Math.min(100, dims[i].score));
-    const r = (R * score) / 100;
-    const x = cx + r * Math.cos(angle(i));
-    const y = cy + r * Math.sin(angle(i));
-    ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = primary;
-    ctx.fill();
-  }
+  const isDark = document.documentElement.classList.contains('theme-dark');
+  radarChart.setOption({
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: isDark ? '#1d2433' : '#ffffff',
+      borderColor: isDark ? '#2c3648' : '#eef1f6',
+      textStyle: { color: isDark ? '#e6ebf4' : '#1f2733' },
+    },
+    animationDuration: 300,
+    radar: {
+      indicator: dims.map((d) => ({ name: d.name, max: 100 })),
+      radius: '68%',
+      axisName: { color: textColor, fontSize: 12 },
+      splitLine: { lineStyle: { color: gridColor } },
+      splitArea: { show: false },
+      axisLine: { lineStyle: { color: gridColor } },
+    },
+    series: [
+      {
+        type: 'radar',
+        symbol: 'circle',
+        symbolSize: 6,
+        data: [
+          {
+            value: dims.map((d) => Math.max(0, Math.min(100, d.score))),
+            name: '面试表现',
+            areaStyle: { color: primary + '33' },
+            lineStyle: { color: primary, width: 2 },
+            itemStyle: { color: primary },
+          },
+        ],
+      },
+    ],
+  });
 }
 
 async function loadQuota() {

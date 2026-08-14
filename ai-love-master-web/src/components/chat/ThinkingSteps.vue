@@ -36,7 +36,7 @@
 
 <script setup lang="ts">
 import { View, ChatDotRound, Setting, Select } from '@element-plus/icons-vue';
-import type { AssistantStep } from '../../store/chatStore';
+import type { AssistantStep } from '../../store/superAgentStore';
 
 defineProps<{
   steps?: AssistantStep[];

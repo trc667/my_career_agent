@@ -7,9 +7,10 @@ const router = createRouter({
     { path: '/', name: 'home', component: () => import('../views/HomePage.vue'), meta: { title: '应用中心' } },
     { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { title: '登录' } },
     { path: '/register', name: 'register', component: () => import('../views/RegisterView.vue'), meta: { title: '注册' } },
-    { path: '/career-master', name: 'career-master', component: () => import('../views/LoveMasterView.vue'), meta: { title: '职规大师', requiresAuth: true } },
+    // 聊天页放行游客（后端 GuestTrialFilter 每日 3 次试用，用完引导注册）
+    { path: '/career-master', name: 'career-master', component: () => import('../views/LoveMasterView.vue'), meta: { title: '职规大师' } },
     { path: '/resume-review', name: 'resume-review', component: () => import('../views/ResumeReviewView.vue'), meta: { title: '简历评分', requiresAuth: true } },
-    { path: '/super-agent', name: 'super-agent', component: () => import('../views/SuperAgentView.vue'), meta: { title: '超级智能体', requiresAuth: true } },
+    { path: '/super-agent', name: 'super-agent', component: () => import('../views/SuperAgentView.vue'), meta: { title: '超级智能体' } },
     { path: '/feedback', name: 'feedback', component: () => import('../views/FeedbackView.vue'), meta: { title: '意见反馈', requiresAuth: true } },
     { path: '/user-center', name: 'user-center', component: () => import('../views/UserCenterView.vue'), meta: { title: '个人中心', requiresAuth: true } },
     { path: '/navigate', name: 'navigate', component: () => import('../views/NavigateView.vue'), meta: { title: '网站导航' } },
@@ -42,7 +43,8 @@ router.beforeEach((to, _from, next) => {
 });
 
 router.afterEach((to) => {
-  document.title = (to.meta.title as string) || 'AI 应用';
+  const pageTitle = (to.meta.title as string) || '';
+  document.title = pageTitle ? `${pageTitle} · cs-careeragent智能平台` : 'cs-careeragent智能平台';
 });
 
 export default router;

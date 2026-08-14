@@ -5,6 +5,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.aimaster.entity.User;
@@ -53,10 +54,16 @@ public class RateLimitByLevelFilter extends OncePerRequestFilter {
     /** ADMIN 不限流 */
     private static final int LIMIT_UNLIMITED = -1;
 
+    /** 每处理多少次请求触发一次窗口清理 */
+    private static final int CLEANUP_EVERY = 1000;
+
     private final UserMapper userMapper;
 
     /** key(username 或 ip) → 最近请求时间戳队列 */
     private final Map<String, Deque<Long>> hits = new ConcurrentHashMap<>();
+
+    /** 请求计数：周期性清理已过期的 key，防止 map 随唯一 IP/用户名无限增长 */
+    private final AtomicLong requestCount = new AtomicLong();
 
     public RateLimitByLevelFilter(UserMapper userMapper) {
         this.userMapper = userMapper;
@@ -77,6 +84,7 @@ public class RateLimitByLevelFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
             return;
         }
+        maybeCleanup();
         String key = resolveKey(request);
         long now = System.currentTimeMillis();
         Deque<Long> queue = hits.computeIfAbsent(key, k -> new ArrayDeque<>());
@@ -95,6 +103,23 @@ public class RateLimitByLevelFilter extends OncePerRequestFilter {
             queue.addLast(now);
         }
         chain.doFilter(request, response);
+    }
+
+    /** 周期性清理：移除窗口内已空的 key，避免匿名 IP/用户 key 无限堆积 */
+    private void maybeCleanup() {
+        if (requestCount.incrementAndGet() % CLEANUP_EVERY != 0) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        hits.entrySet().removeIf(entry -> {
+            Deque<Long> q = entry.getValue();
+            synchronized (q) {
+                while (!q.isEmpty() && now - q.peekFirst() > WINDOW_MS) {
+                    q.pollFirst();
+                }
+                return q.isEmpty();
+            }
+        });
     }
 
     /** 按当前登录用户等级返回限流值；未登录按游客；ADMIN 返回 -1 不限 */

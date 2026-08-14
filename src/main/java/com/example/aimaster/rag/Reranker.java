@@ -43,6 +43,10 @@ public class Reranker {
     /** 精排调用间隔（毫秒）：qwen3-rerank 有 QPS 限制，串行评估时加限速防 429 */
     private final long callIntervalMs;
 
+    /** 上一次调用时间戳与节流锁：最小间隔节流（仅连续请求才等待） */
+    private long lastCallMs = 0;
+    private final Object throttleLock = new Object();
+
     public Reranker(@Value("${spring.ai.dashscope.api-key:}") String apiKey,
                     @Value("${app.rag.rerank-model:qwen3-rerank}") String model,
                     @Value("${app.rag.rerank-interval-ms:300}") long callIntervalMs) {
@@ -52,6 +56,28 @@ public class Reranker {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
+    }
+
+    /**
+     * 最小间隔节流：仅在距上次调用不足 callIntervalMs 时才等待补足间隔，
+     * 避免每次 RAG 请求固定 sleep(间隔) 造成无谓延迟；并发下由锁保证最小间隔。
+     */
+    private void throttle() {
+        if (callIntervalMs <= 0) {
+            return;
+        }
+        synchronized (throttleLock) {
+            long now = System.currentTimeMillis();
+            long waitMs = lastCallMs + callIntervalMs - now;
+            if (waitMs > 0) {
+                try {
+                    Thread.sleep(waitMs);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            lastCallMs = System.currentTimeMillis();
+        }
     }
 
     /**
@@ -71,10 +97,8 @@ public class Reranker {
             return candidates;
         }
         try {
-            // 限速：两次调用间隔，避免触发 QPS 限制（429）
-            if (callIntervalMs > 0) {
-                Thread.sleep(callIntervalMs);
-            }
+            // 限速：最小间隔节流（距上次调用不足间隔才等待），避免每次请求固定 +间隔 且触发 QPS 限制（429）
+            throttle();
             // 构造请求体：{model, input:{query, documents}, parameters:{top_n}}
             Map<String, Object> body = new LinkedHashMap<>();
             Map<String, Object> input = new LinkedHashMap<>();

@@ -105,6 +105,12 @@ export const useSuperAgentStore = defineStore('superAgent', () => {
     conv.updatedAt = now();
   }
 
+  /** 清空全部会话（登出时调用，防止换账号串数据） */
+  function reset() {
+    conversations.value = [];
+    currentConversationId.value = '';
+  }
+
   function ensureCurrentConversation() {
     if (!currentConversation.value) {
       return newConversation();
@@ -208,6 +214,7 @@ export const useSuperAgentStore = defineStore('superAgent', () => {
     switchConversation,
     deleteConversation,
     clearCurrentConversation,
+    reset,
     ensureCurrentConversation,
     addMessage,
     replaceLastAssistantMessage,

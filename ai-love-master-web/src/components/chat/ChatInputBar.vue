@@ -80,8 +80,9 @@ function send() {
   text.value = '';
 }
 
-function onEnter(e: KeyboardEvent) {
-  if (e.ctrlKey || e.metaKey) {
+function onEnter(e: Event) {
+  const ke = e as KeyboardEvent;
+  if (ke.ctrlKey || ke.metaKey) {
     text.value += '\n';
     return;
   }
@@ -147,6 +148,19 @@ function onEnter(e: KeyboardEvent) {
   .input-bar :deep(.el-textarea__inner) {
     min-height: 72px;
     font-size: 16px;
+  }
+
+  /* 模型选择器在窄屏占满整行 */
+  .input-bar__model-select {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  /* 操作按钮均分整行（清空 / 发送·停止），拇指更易点按 */
+  .input-bar__actions :deep(.el-button) {
+    flex: 1;
+    margin-left: 0;
   }
 }
 </style>

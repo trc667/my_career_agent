@@ -210,14 +210,14 @@ async function handleAddWrong(item: BaguQuestion | null) {
 }
 
 /** AI 深入讲解：复用对话接口（chatWithRag），结合题目与原文知识点讲解 */
-async function handleExplain(item: BaguQuestion | null) {
+async function handleExplain(item: { question?: string; content: string } | null) {
   if (!item) return;
   explainVisible.value = true;
   explainLoading.value = true;
   explainText.value = '';
   try {
     const res = await postChatRag({
-      message: `请深入讲解以下计算机八股题目，结合面试场景与追问展开，控制在 300 字内：\n题目：${item.question}\n参考知识点：${item.content}`,
+      message: `请深入讲解以下计算机八股题目，结合面试场景与追问展开，控制在 300 字内：\n题目：${item.question || item.content}\n参考知识点：${item.content}`,
     });
     explainText.value = res.data?.reply ?? 'AI 暂时无法回答，请稍后重试';
   } catch {

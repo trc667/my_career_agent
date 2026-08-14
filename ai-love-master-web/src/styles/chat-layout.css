@@ -67,6 +67,35 @@
   background: var(--app-card);
 }
 
+/* 游客试用提示条（未登录访问聊天页时显示） */
+.chat-guest-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #9a6700;
+  background: #fff7e6;
+  border-bottom: 1px solid #ffe7ba;
+}
+
+.chat-guest-bar a {
+  color: var(--el-color-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.chat-guest-bar a:hover {
+  text-decoration: underline;
+}
+
+.theme-dark .chat-guest-bar {
+  color: #e6c78a;
+  background: #241c0e;
+  border-color: #3a2f16;
+}
+
 @media (max-width: 767px) {
   /* 移动端侧栏遮罩 */
   .chat-layout__mask {

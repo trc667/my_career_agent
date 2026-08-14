@@ -35,6 +35,9 @@
             <span v-if="pointProfile.level === 'VIP' && pointProfile.vipExpireAt" class="uc-points__vip-expire">
               到期 {{ formatTime(pointProfile.vipExpireAt) }}
             </span>
+            <el-button link type="warning" size="small" class="uc-points__vip-link" @click="showVipBenefits = true">
+              💎 查看 VIP 权益
+            </el-button>
           </div>
           <div class="uc-points__actions">
             <el-button type="primary" round :disabled="pointProfile.signedToday" :loading="signing" @click="handleSignIn">
@@ -231,6 +234,8 @@
       <span class="app-orb app-orb--purple uc-orb uc-orb--2" />
     </div>
   </div>
+
+  <VipBenefitsDialog v-model="showVipBenefits" />
 </template>
 
 <script setup lang="ts">
@@ -242,6 +247,7 @@ import { changePassword, claimGuideTask, getAchievements, getGuideTasks, getInvi
 import QRCode from 'qrcode';
 import { useCountUp } from '../composables/useCountUp';
 import { useAuthStore } from '../store/authStore';
+import VipBenefitsDialog from '../components/VipBenefitsDialog.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -250,6 +256,7 @@ const info = reactive<UserInfo>({ id: 0, username: '', createTime: '', avatar: '
 const formRef = ref<FormInstance>();
 const saving = ref(false);
 const signing = ref(false);
+const showVipBenefits = ref(false);
 const pointProfile = reactive<PointProfile>({ points: 0, level: 'FREE', signedToday: false, streakDays: 0, logs: [] });
 
 /* 积分数字滚动 + 签到 7 天周期进度 */

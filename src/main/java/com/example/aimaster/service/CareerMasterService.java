@@ -9,11 +9,6 @@ import com.example.aimaster.dto.CareerReport;
 public interface CareerMasterService {
 
     /**
-     * 单轮对话，无记忆。
-     */
-    ChatResponse chat(String userMessage);
-
-    /**
      * 多轮对话，带会话 ID：会读历史、拼 Prompt、写回记忆。
      * conversationId 为空时视为新会话，会生成新 ID 并放在响应中返回。
      */

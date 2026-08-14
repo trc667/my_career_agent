@@ -41,7 +41,7 @@
       </svg>
     </div>
     <!-- 浮动代码符号（贴合计算机学生用户群） -->
-    <span v-for="(c, i) in codeSpots" :key="i" class="auth-code" :style="codeStyle(c, i)">
+    <span v-for="(c, i) in codeSpots" :key="i" class="auth-code" :style="codeStyle(c)">
       {{ c.text }}
     </span>
   </div>

@@ -71,15 +71,38 @@ app:
     enabled: false
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  # JWT：生产必须显式提供 JWT_SECRET（无默认值，缺失则启动失败，杜绝弱密钥）
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  # RAG 向量库（PostgreSQL + pgvector）：与 dev 一致，密码等走环境变量
+  vector-datasource:
+    url: ${VECTOR_DB_URL:jdbc:postgresql://localhost:5432/vectordb}
+    username: ${VECTOR_DB_USERNAME:postgres}
+    password: ${VECTOR_DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
   memory:
-    type: file
-    max-messages-per-conversation: 20
-    file:
-      base-dir: ${MEMORY_BASE_DIR:./data/chat-memory}
+    # 与 dev 保持一致：聊天历史落 MySQL（跨设备同步），而非旧的 file 存储
+    type: db
+    max-messages-per-conversation: ${MEMORY_MAX_MESSAGES:50}
+    history-token-budget: ${HISTORY_TOKEN_BUDGET:4000}
+    enable-summary: ${ENABLE_SUMMARY:true}
+    summary-max-chars: ${SUMMARY_MAX_CHARS:800}
+    summary-cache-max-size: ${SUMMARY_CACHE_MAX_SIZE:500}
+    summary-cache-ttl-minutes: ${SUMMARY_CACHE_TTL_MINUTES:360}
   rag:
-    chunk-size: ${RAG_CHUNK_SIZE:500}
-    min-chunk-size-chars: 100
+    chunk-size: ${RAG_CHUNK_SIZE:250}
+    min-chunk-size-chars: 60
     keep-separator: false
+    # 混合检索（向量 + BM25 → RRF → rerank 精排），与 dev 对齐
+    hybrid:
+      rrf-top-n: 10
+      rrf-k: 60
+      rerank-enabled: true
+      rerank-top-n: 10
+    hyde:
+      enabled: true
+      length-threshold: 40
   file-save:
     base-dir: ${FILE_SAVE_DIR:./data/files}
   react-stream:

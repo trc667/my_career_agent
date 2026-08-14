@@ -35,6 +35,10 @@
           <el-button link size="small" @click="handleLogout">退出</el-button>
         </div>
       </el-header>
+      <!-- 游客试用提示条（登录后隐藏） -->
+      <div v-if="!authStore.isAuthenticated()" class="chat-guest-bar">
+        🎁 游客模式：每日可试用 3 次，<router-link to="/register">免费注册</router-link> 后无限畅聊
+      </div>
       <el-main class="chat-layout__main">
         <ChatMessageList
           :messages="currentConversation?.messages || []"
@@ -42,6 +46,7 @@
           :streaming-content="typing ? streamingContent : null"
           @feedback="handleFeedback"
           @regenerate="regenerate"
+          @quick="handleSend"
         />
       </el-main>
       <el-footer class="chat-layout__footer">
@@ -132,7 +137,7 @@ onMounted(async () => {
       chatModels.value = res.data ?? [];
       if (chatModels.value.length) {
         const valid = chatModels.value.some((m) => m.id === selectedModel.value);
-        if (!valid) selectedModel.value = chatModels.value.find((m) => m.default)?.id ?? chatModels.value[0].id;
+        if (!valid) selectedModel.value = chatModels.value.find((m) => m.default)?.id ?? chatModels.value[0]!.id;
       }
     })
     .catch(() => {});

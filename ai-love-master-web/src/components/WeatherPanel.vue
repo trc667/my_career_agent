@@ -146,7 +146,7 @@ function cloudStyle(n: number) {
   const sizes = [90, 62, 120, 74, 104];
   const tops = [22, 46, 60, 34, 52];
   const durs = [16, 20, 24, 18, 22];
-  const size = sizes[n % sizes.length];
+  const size = sizes[n % sizes.length] ?? 90;
   return {
     width: size + 'px',
     height: Math.round(size * 0.33) + 'px',

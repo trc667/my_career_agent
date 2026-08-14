@@ -1,5 +1,21 @@
 <template>
   <div class="chat-list">
+    <!-- 空状态：新会话欢迎 + 快捷提问（新用户零门槛体验） -->
+    <div v-if="!messages.length && !typing" class="chat-list__empty">
+      <div class="chat-list__empty-icon">👋</div>
+      <p class="chat-list__empty-title">开始你的第一次对话</p>
+      <p class="chat-list__empty-desc">职业规划 · 学习路线 · 校招备战 · 面试技巧，都可以问我</p>
+      <div class="chat-list__empty-qs">
+        <button
+          v-for="q in quickQuestions"
+          :key="q"
+          class="chat-list__empty-q"
+          @click="emit('quick', q)"
+        >
+          {{ q }}
+        </button>
+      </div>
+    </div>
     <div
       v-for="m in messages"
       :key="m.id"
@@ -73,7 +89,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import type { ChatMessage } from '../../store/chatStore';
+import type { ChatMessage } from '../../store/superAgentStore';
 import ThinkingSteps from './ThinkingSteps.vue';
 import { renderMarkdown } from '../../utils/markdown';
 import { getAiAvatar, getUserMe } from '../../api/user';
@@ -87,7 +103,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'feedback', payload: { messageId: string; type: 'up' | 'down' }): void;
   (e: 'regenerate'): void;
+  (e: 'quick', text: string): void;
 }>();
+
+/** 空状态快捷提问 */
+const quickQuestions = [
+  '计算机专业现在什么方向好就业？',
+  '校招前怎么准备算法和八股？',
+  '帮我规划一份 Java 后端学习路线',
+];
 
 const scrollAnchor = ref<HTMLElement | null>(null);
 const aiAvatar = ref('');
@@ -170,11 +194,12 @@ async function copyMessage(m: ChatMessage) {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--app-border);
-  background: #f5f7fa;
+  background: var(--chat-user-bg);
 }
 
 .chat-list__item--assistant .chat-list__bubble {
-  background: #ecf5ff;
+  background: var(--chat-assistant-bg);
+  border-color: var(--chat-assistant-border);
 }
 
 .chat-list__content {
@@ -320,6 +345,69 @@ async function copyMessage(m: ChatMessage) {
   50% {
     opacity: 0;
   }
+}
+
+/* 移动端：气泡加宽，充分利用窄屏空间 */
+@media (max-width: 767px) {
+  .chat-list__bubble {
+    max-width: 88%;
+  }
+}
+
+/* 空状态：新会话欢迎 + 快捷提问 */
+.chat-list__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 55vh;
+  text-align: center;
+  padding: var(--app-space-xl);
+}
+
+.chat-list__empty-icon {
+  font-size: 42px;
+}
+
+.chat-list__empty-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--app-text);
+}
+
+.chat-list__empty-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--app-text-secondary);
+}
+
+.chat-list__empty-qs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  max-width: 380px;
+  width: 100%;
+}
+
+.chat-list__empty-q {
+  padding: 10px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-card);
+  color: var(--app-text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.chat-list__empty-q:hover {
+  border-color: var(--app-accent-blue);
+  color: var(--app-accent-blue);
+  background: var(--app-primary-soft);
 }
 </style>
 
